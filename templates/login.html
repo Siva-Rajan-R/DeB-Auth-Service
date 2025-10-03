@@ -5,76 +5,105 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Super Duper Access Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+    
+    .glow-effect {
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    }
+    
+    .cyber-grid {
+      background-image: 
+        linear-gradient(rgba(139, 92, 246, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(139, 92, 246, 0.1) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+  </style>
 </head>
-<body class="h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600">
-  <div class="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl p-8 relative">
+<body class="h-screen bg-black cyber-grid flex items-center justify-center p-4 scale-{{ scale }}">
+  <div class="w-full max-w-md bg-gradient-to-br from-gray-900 to-black border border-purple-500/30 rounded-2xl shadow-2xl p-6 md:p-8 glow-effect">
     <!-- Header -->
-    <h2 class="text-3xl md:text-4xl font-extrabold text-center text-indigo-700 mb-8 tracking-wide drop-shadow-sm">
-      Access Portal
-    </h2>
+    <div class="text-center mb-8">
+      <h2 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+        Access Portal
+      </h2>
+      <p class="text-gray-400 text-sm">Welcome back! Enter your credentials to continue.</p>
+    </div>
 
     <!-- Form -->
-    <form method="post" action="/auth/login/otp" class="space-y-6">
+    <form {% if is_preview %} onsubmit="return false" {% else %} method="post" action="/auth/login/otp" {% endif %}  class="space-y-6">
       <!-- Hidden auth_id -->
       <input type="hidden" name="auth_id" value="{{ auth_id }}"/>
 
       <!-- Email -->
       <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+        <label class="block text-sm font-medium text-gray-300 mb-2">Email</label>
         <input type="email" name="email" required
-          class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-300 transition shadow-sm"/>
+          class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white transition shadow-sm"/>
       </div>
       
       <!-- Full Name -->
       <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-1">Full Name</label>
+        <label class="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
         <input type="text" name="fullname" required
-          class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-300 transition shadow-sm"/>
+          class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white transition shadow-sm"/>
       </div>
       
       <!-- Submit Button -->
       <button type="submit" 
-        class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl hover:scale-[1.02] transition-transform shadow-lg font-semibold">
+        class="w-full bg-gradient-to-r from-purple-600 to-cyan-600 text-white py-3 rounded-xl hover:opacity-90 transition-all shadow-lg font-semibold">
         Continue
       </button>
     </form>
 
     <!-- OR Separator -->
     <div class="flex items-center my-6">
-      <hr class="flex-grow border-t border-gray-300"/>
-      <span class="mx-3 text-gray-400 font-medium">OR</span>
-      <hr class="flex-grow border-t border-gray-300"/>
+      <hr class="flex-grow border-t border-gray-700"/>
+      <span class="mx-3 text-gray-500 font-medium text-sm">OR</span>
+      <hr class="flex-grow border-t border-gray-700"/>
     </div>
 
-    <!-- Social Buttons Horizontal -->
-    <div class="flex space-x-4">
+    <!-- Social Buttons -->
+    <div class="flex flex justify-evenly items-center ">
+      {% if 'google' in auth_methods %}
       <!-- Google -->
-      <button onclick="window.location.href='/auth/google/login/{{ auth_id }}'" 
-        class="flex-1 flex items-center justify-center bg-white border border-gray-300 py-3 rounded-xl hover:bg-gray-100 transition-all shadow-md font-medium">
-        <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="w-6 h-6 mr-2"/>
-        <span class="text-gray-700">Google</span>
+      <button
+        {% if not is_preview %} onclick="window.location.href='/auth/google/login/{{ auth_id }}'" {% endif %}
+        class="flex items-center justify-center bg-gray-800 border border-gray-700 p-3 rounded-xl hover:bg-gray-700 transition-all shadow-md font-medium text-white w-fit">
+        <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="w-5 h-5 rounded-2xl"/>
+        <span class="max-sm:hidden text-gray-300 ml-2">Google</span>
       </button>
+       {% endif %}
 
+       {% if 'github' in auth_methods %}
       <!-- Github -->
-      <button onclick="window.location.href='/auth/github/login/{{ auth_id }}'" 
-        class="flex-1 flex items-center justify-center bg-white border border-gray-300 py-3 rounded-xl hover:bg-gray-100 transition-all shadow-md font-medium">
-        <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="Github" class="w-6 h-6 mr-2"/>
-        <span class="text-gray-700">GitHub</span>
+      <button
+        {% if not is_preview %} onclick="window.location.href='/auth/github/login/{{ auth_id }}'" {% endif %}
+        class="flex items-center justify-center bg-gray-800 border border-gray-700 p-3 rounded-xl hover:bg-gray-700 transition-all shadow-md font-medium text-white w-fit">
+        <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="Github" class="w-5 h-5 rounded-2xl"/>
+        <span class="max-sm:hidden text-gray-300 ml-2">GitHub</span>
       </button>
-
+       {% endif %}
+      
+       {% if 'facebook' in auth_methods %}
       <!-- Facebook -->
-      <button onclick="window.location.href='/auth/facebook/login/{{ auth_id }}'" 
-        class="flex-1 flex items-center justify-center bg-white border border-gray-300 py-3 rounded-xl hover:bg-gray-100 transition-all shadow-md font-medium">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png" alt="Facebook" class="w-6 h-6 mr-2"/>
-        <span class="text-gray-700">Facebook</span>
+      <button
+        {% if not is_preview %} onclick="window.location.href='/auth/facebook/login/{{ auth_id }}'" {% endif %}
+        class="flex items-center justify-center bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all shadow-md font-medium text-white w-fit p-3">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png" alt="Facebook" class="w-5 h-5 rounded-2xl"/>
+        <span class="max-sm:hidden text-gray-300 ml-2">Facebook</span>
       </button>
+       {% endif %}
     </div>
     
     <!-- Footer -->
-    <p class="text-center text-gray-500 text-sm mt-8">Welcome back! Enter your credentials to continue.</p>
-    <div class="mt-6 text-center">
-      <span class="text-xs text-gray-400">Powered by 
-        <span class="font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">De-Buggers</span>
+    <div class="mt-8 text-center">
+      <span class="text-xs text-gray-500">Powered by 
+        <span class="font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">{{ branding }}</span>
       </span>
     </div>
   </div>

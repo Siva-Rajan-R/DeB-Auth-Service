@@ -2,7 +2,7 @@ from cryptography.fernet import Fernet
 from cryptography.exceptions import InvalidSignature
 from dotenv import load_dotenv
 import os
-load_dotenv
+load_dotenv()
 
 SYMME_KEY=os.getenv("SYMMETRIC_KEY_SECRET")
 fernet_obj=Fernet(SYMME_KEY.encode())

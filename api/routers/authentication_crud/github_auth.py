@@ -1,6 +1,6 @@
 from fastapi import APIRouter,HTTPException
 from fastapi.responses import RedirectResponse
-from fb_database.operations.users_crud import get_user_by_id
+from fb_database.operations.users_crud import get_user_by_email
 from security.unique_id import generate_unique_id
 from security.jwt_token import generate_jwt_token
 from security.jwt_token import generate_jwt_token
@@ -16,7 +16,7 @@ from globals import auth_dict,authenticated_dict,STATE_STORE
 
 GITHUB_CLIENT_ID=os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET=os.getenv("GITHUB_CLIENT_SECRET")
-GITHUB_REDIRECT_URI="http://localhost:8000/auth/github/callback"
+GITHUB_REDIRECT_URI="http://127.0.0.1:8000/auth/github/callback"
 
 router=APIRouter(
     tags=["GitHub Authentication"]
@@ -87,14 +87,22 @@ def github_login_callback(code: str, state: str):
     suffix_token=secrets.token_urlsafe(10)
     ic(auth_dict)
     extracted_auth_dict=auth_dict[STATE_STORE[state]]
-    auth_code=sha256(get_user_by_id(extracted_auth_dict['user_id']).get('client_secret').encode()).hexdigest()[:10]+suffix_token
+    secret=get_user_by_email(extracted_auth_dict['user_id']).get('secrets',[])
+    client_secret=secret.get(extracted_auth_dict['apikey'],None)
+
+    if not client_secret:
+        raise HTTPException(
+            status_code=403,
+            detail="client secret not found"
+        )
+    auth_code=sha256(client_secret.encode()).hexdigest()[:10]+suffix_token
 
     app_token = generate_jwt_token({
         "email": primary_email,
         "name": user_info.get("name") or user_info.get("login"),
         'profile_picture': user_info.get("avatar_url"),
-    })
-    authenticated_dict[auth_code]={'token':app_token,'suffix_token':suffix_token}
+    },exp_min=60)
+    authenticated_dict[auth_code]={'token':app_token,'suffix_token':suffix_token,'user_id':extracted_auth_dict['user_id'],'apikey':extracted_auth_dict['apikey']}
     del STATE_STORE[state]
     ic(app_token)
 

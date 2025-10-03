@@ -5,6 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OTP Verification</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+    
+    .glow-effect {
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    }
+    
+    .cyber-grid {
+      background-image: 
+        linear-gradient(rgba(139, 92, 246, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(139, 92, 246, 0.1) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+  </style>
   <script>
     // Auto move to next input
     function moveNext(current, nextId) {
@@ -33,13 +51,16 @@
     }
   </script>
 </head>
-<body class="h-screen flex items-center justify-center bg-gradient-to-br from-green-400 via-emerald-500 to-teal-600">
-  <div class="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl p-8 relative">
+<body class="h-screen bg-black cyber-grid flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-gradient-to-br from-gray-900 to-black border border-purple-500/30 rounded-2xl shadow-2xl p-6 md:p-8 glow-effect">
     
     <!-- Header -->
-    <h2 class="text-3xl md:text-4xl font-extrabold text-center text-emerald-700 mb-8 tracking-wide drop-shadow-sm">
-      🔐 OTP Verification
-    </h2>
+    <div class="text-center mb-8">
+      <h2 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+        🔐 OTP Verification
+      </h2>
+      <p class="text-gray-400 text-sm">Enter the 6-digit OTP sent to your email.</p>
+    </div>
 
     <!-- OTP Form -->
     <form method="post" action="/auth/login/verify" class="space-y-6">
@@ -49,22 +70,22 @@
       <!-- OTP 6 Boxes -->
       <div class="flex justify-between space-x-2">
         <input id="otp1" type="text" maxlength="1" name="otp1"
-          class="w-12 h-12 border border-gray-300 rounded-xl text-center text-lg font-mono focus:outline-none focus:ring-4 focus:ring-emerald-300"
+          class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp2')" onpaste="handlePaste(event)" />
         <input id="otp2" type="text" maxlength="1" name="otp2"
-          class="w-12 h-12 border border-gray-300 rounded-xl text-center text-lg font-mono focus:outline-none focus:ring-4 focus:ring-emerald-300"
+          class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp3')" onkeydown="if(event.key==='Backspace') movePrev(this,'otp1')" />
         <input id="otp3" type="text" maxlength="1" name="otp3"
-          class="w-12 h-12 border border-gray-300 rounded-xl text-center text-lg font-mono focus:outline-none focus:ring-4 focus:ring-emerald-300"
+          class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp4')" onkeydown="if(event.key==='Backspace') movePrev(this,'otp2')" />
         <input id="otp4" type="text" maxlength="1" name="otp4"
-          class="w-12 h-12 border border-gray-300 rounded-xl text-center text-lg font-mono focus:outline-none focus:ring-4 focus:ring-emerald-300"
+          class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp5')" onkeydown="if(event.key==='Backspace') movePrev(this,'otp3')" />
         <input id="otp5" type="text" maxlength="1" name="otp5"
-          class="w-12 h-12 border border-gray-300 rounded-xl text-center text-lg font-mono focus:outline-none focus:ring-4 focus:ring-emerald-300"
+          class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp6')" onkeydown="if(event.key==='Backspace') movePrev(this,'otp4')" />
         <input id="otp6" type="text" maxlength="1" name="otp6"
-          class="w-12 h-12 border border-gray-300 rounded-xl text-center text-lg font-mono focus:outline-none focus:ring-4 focus:ring-emerald-300"
+          class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           onkeydown="if(event.key==='Backspace') movePrev(this,'otp5')" />
       </div>
 
@@ -80,20 +101,15 @@
           document.getElementById('otp4').value +
           document.getElementById('otp5').value +
           document.getElementById('otp6').value";
-        class="w-full bg-gradient-to-r from-emerald-600 to-green-600 text-white py-3 rounded-xl hover:scale-[1.02] transition-transform shadow-lg font-semibold mt-6">
+        class="w-full bg-gradient-to-r from-purple-600 to-cyan-600 text-white py-3 rounded-xl hover:opacity-90 transition-all shadow-lg font-semibold mt-6">
         Verify
       </button>
     </form>
 
-    <!-- Info -->
-    <p class="text-center text-gray-500 text-sm mt-6">
-      Enter the 6-digit OTP sent to your email.
-    </p>
-
     <!-- Footer -->
     <div class="mt-6 text-center">
-      <span class="text-xs text-gray-400">Powered by 
-        <span class="font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">De-Buggers</span>
+      <span class="text-xs text-gray-500">Powered by 
+        <span class="font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">De-Buggers</span>
       </span>
     </div>
   </div>

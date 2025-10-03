@@ -1,6 +1,6 @@
 from fastapi import APIRouter,HTTPException
 from fastapi.responses import RedirectResponse
-from fb_database.operations.users_crud import get_user_by_id
+from fb_database.operations.users_crud import get_user_by_email
 from security.unique_id import generate_unique_id
 from security.jwt_token import generate_jwt_token
 from security.jwt_token import generate_jwt_token
@@ -15,7 +15,7 @@ from urllib.parse import urlencode
 import requests
 from globals import auth_dict,authenticated_dict,STATE_STORE
 
-GOOGLE_REDIRECT_URI="http://localhost:8000/auth/google/callback"
+GOOGLE_REDIRECT_URI="http://127.0.0.1:8000/auth/google/callback"
 GOOGLE_CLIENT_ID=os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET=os.getenv("GOOGLE_CLIENT_SECRET")
 
@@ -46,7 +46,7 @@ def google_login(auth_id:str):
     }
 
     google_auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
-    return RedirectResponse(url=google_auth_url)
+    return RedirectResponse(url=google_auth_url,status_code=302)
 
 
 @router.get("/auth/google/callback")
@@ -71,9 +71,17 @@ def google_callback(code: str,state: str):
     token_data = resp.json()
     id_token = token_data.get("id_token")
 
-    suffix_token=secrets.token_urlsafe(10)
     extracted_auth_dict=auth_dict[STATE_STORE[state]]
-    auth_code=sha256(get_user_by_id(extracted_auth_dict['user_id']).get('client_secret').encode()).hexdigest()[:10]+suffix_token
+    ic(extracted_auth_dict)
+    suffix_token=secrets.token_urlsafe(10)
+    secret=get_user_by_email(extracted_auth_dict['user_id']).get('secrets',[])
+    client_secret=secret.get(extracted_auth_dict['apikey'],None)
+    if not client_secret:
+        raise HTTPException(
+            status_code=403,
+            detail="client secret not found"
+        )
+    auth_code=sha256(client_secret.encode()).hexdigest()[:10]+suffix_token
     ic(id_token)
     user_info = jwt.decode(id_token, options={"verify_signature": False})
     email = user_info.get("email")
@@ -84,8 +92,8 @@ def google_callback(code: str,state: str):
         "email": email,
         "name": name,
         'profile_picture': profile_picture,
-    })
+    },exp_min=60)
 
-    authenticated_dict[auth_code]={'token':app_token,'suffix_token':suffix_token}
+    authenticated_dict[auth_code]={'token':app_token,'suffix_token':suffix_token,'user_id':extracted_auth_dict['user_id'],'apikey':extracted_auth_dict['apikey']}
     del STATE_STORE[state]
     return RedirectResponse(url=f"{extracted_auth_dict['redirect_url']}?code={auth_code}", status_code=302)

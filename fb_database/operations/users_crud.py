@@ -1,35 +1,161 @@
 from fb_database.main import db
 from input_formats.dict_inputs import User
 from icecream import ic
+from dotenv import load_dotenv
+from fastapi import HTTPException,Request
+import os
+from input_formats.dict_inputs import Configuration,AuthMethods
+load_dotenv()
 
 USER_CHILD_NAME="DeB-Users"
 APIKEYS_CHILD_NAME="DeB-APIKeys"
-SECRET_CHILD_NAME="DeB-Secrets"
 
-def create_user(user:User,user_pk:str,user_apikey:str,user_client_secret:str):
+def email_key_generator(email:str):
+    return email.replace('.','_').replace('@','_at_')
+
+def create_user(user:User):
     try:
-        db.child(USER_CHILD_NAME).child(user_pk).set(user)
-        db.child(APIKEYS_CHILD_NAME).child(user_apikey).set(user_pk)
-        db.child(SECRET_CHILD_NAME).child(user_client_secret).set(user_pk)
-
+        email_key = email_key_generator(user['email'])
+        is_user=get_user_by_email(user['email'])
+        ic(is_user)
+        if not is_user:
+            db.child(USER_CHILD_NAME).child(email_key).set(user) #{'apikey': user_apikey, 'client_secret': user_client_secret, 'email': user.email, 'full_name': user.full_name}
 
         return "User Created Successfully"
     
     except Exception as e:
         ic(f"something went wrong while creating user {e}")
-    
-def delete_user(user_pk:str):
+
+def create_secrets(email:str,apikey:str,client_sceret:str,configurations:Configuration):
     try:
-        user_data = db.child(USER_CHILD_NAME).child(user_pk).get().val()
+        email_key=email_key_generator(email)
+        user=db.child(USER_CHILD_NAME).child(email_key).get().val()
+        if not user:
+            return "User not found"
+        
+        if user.get('secrets',None):
+            user['secrets'][apikey]=client_sceret
+        else:
+            user['secrets']={apikey:client_sceret}
+        
+        ic(user.get('remove_branding',False))
+        if not user.get('remove_branding',False):
+            configurations['branding']='De-Buggers'
+
+        configurations['user_id']=email
+        ic(configurations)
+        db.child(APIKEYS_CHILD_NAME).child(apikey).set(configurations)
+        db.child(USER_CHILD_NAME).child(email_key).set(user)
+        return "Api key added successfully"
+    
+    except Exception as e:
+        ic(f"something went wrong while adding apikey {e}")
+
+def revoke_secrets(email:str,old_apikey:str,new_apikey:str,new_client_secret:str):
+    try:
+        email_key=email_key_generator(email)
+
+        user=db.child(USER_CHILD_NAME).child(email_key).get().val()
+        if not user:
+            return "User not found"
+        
+        secrets=user.get('secrets',{})
+        if not secrets.get(old_apikey,None):
+            return "Old apikey not found"
+        
+        del secrets[old_apikey]
+
+        old_config_q=db.child(APIKEYS_CHILD_NAME).child(old_apikey)
+        old_configurations=old_config_q.get().val()
+        updates = {
+            f"{APIKEYS_CHILD_NAME}/{old_apikey}": None,
+        }
+        db.update(updates)  # atomic del
+
+        secrets[new_apikey]=new_client_secret
+        user['secrets']=secrets
+        db.child(USER_CHILD_NAME).child(email_key).set(user)
+
+        db.child(APIKEYS_CHILD_NAME).child(new_apikey).set(old_configurations)
+
+        return "Api key revoked successfully"
+    
+    except Exception as e:
+        ic(f"something went wrong while revoking apikey {e}")
+
+def remove_apikey(email:str,apikey:str):
+    try:
+        email_key=email_key_generator(email)
+        user=db.child(USER_CHILD_NAME).child(email_key).get().val()
+        if not user:
+            return "User not found"
+        
+        secrets=user.get('secrets',{})
+        if not secrets.get(apikey,None):
+            return "Apikey not found"
+        
+        del secrets[apikey]
+
+        user['secrets']=secrets
+        db.child(USER_CHILD_NAME).child(email_key).set(user)
+        db.update({f"{APIKEYS_CHILD_NAME}/{apikey}": None})  # atomic del
+        return "Api key removed successfully"
+    except Exception as e:
+        ic(f"something went wrong while removing apikey {e}")
+
+def update_cofigurations(email:str,apikey:str,new_configurations:Configuration):
+    try:
+        email_key=email_key_generator(email)
+        user=db.child(USER_CHILD_NAME).child(email_key).get().val()
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail="User does not exists"
+            )
+        
+        secrets=user.get('secrets',{})
+        if not secrets.get(apikey,None):
+            raise HTTPException(
+                status_code=404,
+                detail="api key not found"
+            )
+        
+        ic(user.get('remove_branding',False))
+        if not user.get('remove_branding',False):
+            new_configurations['branding']='De-Buggers'
+
+        new_configurations['user_id']=email
+        
+        ic(new_configurations)
+        update={
+            f'{APIKEYS_CHILD_NAME}/{apikey}':new_configurations
+        }
+
+        db.update(update)
+
+        return "updated configurations successfully"
+    
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        ic(f"something went wrong while updating configurations {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while updating configurations {e}"
+        )
+    
+def delete_user(user_email:str):
+    try:
+        email_key=email_key_generator(user_email)
+        user_data = db.child(USER_CHILD_NAME).child(email_key).get().val()
         if not user_data:
             return "User not found"
 
         apikey = user_data.get("apikey")
-        secret=user_data.get("client_secret")
         updates = {
-            f"{USER_CHILD_NAME}/{user_pk}": None,
+            f"{USER_CHILD_NAME}/{email_key}": None,
             f"{APIKEYS_CHILD_NAME}/{apikey}": None,
-            f"{SECRET_CHILD_NAME}/{secret}": None
         }
 
         db.update(updates)  # atomic del
@@ -40,12 +166,36 @@ def delete_user(user_pk:str):
     except Exception as e:
         ic(f"something went wrong while deleting user {e}")
 
-def get_user_by_id(user_pk:str):
+def get_user_by_email(user_email:str):
     try:
-        user=db.child(USER_CHILD_NAME).child(user_pk).get().val()
-        ic(user,user_pk)
-        ic(user['client_secret'])
+        email_key=email_key_generator(user_email)
+        user=db.child(USER_CHILD_NAME).child(email_key).get().val()
+        ic(user,email_key)
         return user
+    except Exception as e:
+        ic(f"something went wrong while get user by id {e}")
+
+def get_user_secrets(user_email:str):
+    try:
+        email_key=email_key_generator(user_email)
+        user=db.child(USER_CHILD_NAME).child(email_key).get().val()
+        ic(user,email_key)
+        final_secrets=[]
+        secrets=user.get('secrets',[])
+        for apikey,client_secret in secrets.items():
+            config=db.child(APIKEYS_CHILD_NAME).child(apikey).get().val()
+            ic(apikey,client_secret,config)
+            del config['user_id']
+            final_secrets.append(
+                {
+                    'apikey':apikey,
+                    'client_secret':client_secret,
+                    'configurations':config
+                }
+            )
+        branding=user.get('remove_branding',False)
+
+        return {'secrets':final_secrets,'branding':branding}
     except Exception as e:
         ic(f"something went wrong while get user by id {e}")
 
@@ -66,13 +216,33 @@ def check_apikey_exists(apikey:str):
     except Exception as e:
         ic(f"something went wrong while checking apikey {e}")
 
-def check_client_secret_exists(client_secret:str):
-    try:
-        is_present=db.child(SECRET_CHILD_NAME).child(client_secret).get().val()
 
-        if not is_present:
-            return False
-        ic(is_present)
-        return is_present
+def create_debuggers_cred(base_url:str):
+    try:
+
+        user=User(
+                name="DeB-Auth-System",
+                email=os.getenv('DEB_EMAIL'),
+                secrets={},
+                remove_branding=False,
+                max_keys=2
+            )
+
+        create_user(user=user)
+
+        create_secrets(
+            email=os.getenv('DEB_EMAIL'),
+            apikey=os.getenv("DEB_APIKEY"),
+            client_sceret=os.getenv('DEB_CLIENT_SECRET'),
+            configurations=Configuration(
+                auth_methods=[AuthMethods.otp,AuthMethods.google,AuthMethods.github],
+                branding="De-Buggers",
+                redirect_url=f"{base_url}user/create"
+            )
+        )
+
+        return "Debuggers Credentials Created Successfully"
+    
     except Exception as e:
-        ic(f"something went wrong while checking client secret {e}")
+        ic(f"something went wrong creating debuggers cred : {e}")
+        raise
