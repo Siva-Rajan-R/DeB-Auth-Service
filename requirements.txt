@@ -29,4 +29,5 @@ asyncpg
 gunicorn
 jinja2
 pyrebase4
+itsdangerous
 uvloop

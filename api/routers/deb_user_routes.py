@@ -5,8 +5,8 @@ from security.unique_id import generate_unique_id
 from security.api_key import generate_api_key
 from pydantic import BaseModel,EmailStr
 from input_formats.dict_inputs import User,Configuration,AuthMethods
-from fb_database.operations.users_crud import create_user,get_user_by_email,get_all_users,delete_user,create_secrets,revoke_secrets,remove_apikey,update_cofigurations,get_user_secrets,check_apikey_exists
-from .authentication_crud.otp_auth import authenticate,get_authenticated_user,AuthSchema,AuthenticatedUserSchema
+from operations.fb_operations.users_crud import create_user,get_user_by_email,get_all_users,delete_user,create_secrets,revoke_secrets,remove_apikey,update_cofigurations,get_user_secrets,check_apikey_exists
+from .auth_routes import authenticate,get_authenticated_user,AuthSchema,AuthenticatedUserSchema
 from dotenv import load_dotenv
 import os,jwt,json
 from security.jwt_token import generate_jwt_token
@@ -14,6 +14,7 @@ from security.sym_encrypt import encrypt_data
 from icecream import ic
 from typing import List,Optional
 from fastapi.templating import Jinja2Templates
+from exceptions.session_exp import SessionExpired
 load_dotenv()
 
 router=APIRouter(
@@ -41,8 +42,8 @@ DEB_USER_JWT_ALGORITHM=os.getenv("DEB_USER_JWT_ALGORITHM","HS256")
 DEB_USER_JWT_KEY=os.getenv("DEB_USER_JWT_KEY")
 
 @router.get("/user/auth")
-def user_auth(request:Request):
-    response=authenticate(
+async def user_auth(request:Request):
+    response=await authenticate(
         inp=AuthSchema(
             apikey=os.getenv("DEB_APIKEY"),
         ),
@@ -51,8 +52,23 @@ def user_auth(request:Request):
     return response
 
 @router.get("/user/create")
-def create_users(code:str,request:Request):
-    auth_user=jwt.decode(get_authenticated_user(inp=AuthenticatedUserSchema(code=code,client_secret=os.getenv("DEB_CLIENT_SECRET")),request=request)['token'],options={"verify_signature": False})
+async def create_users(request:Request,code:Optional[str]=None):
+    ic(code)
+    if not code:
+        raise SessionExpired(
+            redirect_url="http://localhost:5173/",
+            message="Authentication Falied redirecting to DeB-Auth-Service"
+        )
+    
+    token=await get_authenticated_user(inp=AuthenticatedUserSchema(code=code,client_secret=os.getenv("DEB_CLIENT_SECRET")),request=request)
+    ic(token)
+    if not token.get('token',None):
+        raise HTTPException(
+            status_code=404,
+            detail="token is missing from DeB-Auth-Service"
+        )
+    
+    auth_user=jwt.decode(token['token'],options={"verify_signature": False})
 
     formatted_user=User(
         name=auth_user['name'],
@@ -76,22 +92,7 @@ def create_users(code:str,request:Request):
 @router.post("/user/secrets")
 def create_user_secrets(inp:Configuration,user_email:str=Depends(verify_user)):
     ic(user_email)
-    user=get_user_by_email(user_email)
-    
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="user not found"
-        )
-    
-    no_of_secrets=len(user.get('secrets',{}))
-    max_keys=user.get('max_keys')
-    ic(no_of_secrets,max_keys)
-    if no_of_secrets>=max_keys:
-        raise HTTPException(
-            status_code=403,
-            detail="max keys limit reached"
-        )
+
     
     return create_secrets(
         email=user_email,
@@ -162,4 +163,14 @@ def get_user_login_page(apikey:str,request:Request):
             detail="apikey not found"
         )
     
-    return template.TemplateResponse(name="login.html",context={'request':request,'is_preview':True,'scale':50,'auth_id':None,'auth_methods':config.get('auth_methods',[]),"branding":config.get('branding',"De-Buggers")})
+    return template.TemplateResponse(
+        name="login.html",
+        context={
+            'request':request,
+            'is_preview':True,
+            'scale':50,
+            'auth_id':None,
+            'auth_methods':config.get('auth_methods',[]),
+            "branding":config.get('branding',"De-Buggers")
+        }
+    )

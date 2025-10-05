@@ -1,4 +1,5 @@
-from fb_database.main import db
+from fastapi.exceptions import HTTPException
+from configs.firebase_config import db
 from input_formats.dict_inputs import User
 from icecream import ic
 from dotenv import load_dotenv
@@ -19,37 +20,65 @@ def create_user(user:User):
         is_user=get_user_by_email(user['email'])
         ic(is_user)
         if not is_user:
-            db.child(USER_CHILD_NAME).child(email_key).set(user) #{'apikey': user_apikey, 'client_secret': user_client_secret, 'email': user.email, 'full_name': user.full_name}
+            db.child(USER_CHILD_NAME).child(email_key).set(user) #{ secrets : { user_apikey : user_client_secret }, 'email': user.email, 'full_name': user.full_name,remove_branding:true | False,max_keys:2}
 
         return "User Created Successfully"
     
+    except HTTPException:
+        raise
+
     except Exception as e:
         ic(f"something went wrong while creating user {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while creating user {e}"
+        )
 
 def create_secrets(email:str,apikey:str,client_sceret:str,configurations:Configuration):
     try:
         email_key=email_key_generator(email)
         user=db.child(USER_CHILD_NAME).child(email_key).get().val()
         if not user:
-            return "User not found"
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
+        
+        cur_no_of_secrets=len(user.get('secrets',{}))
+        max_keys=user.get('max_keys')
+
+        if cur_no_of_secrets>=max_keys:
+            raise HTTPException(
+                status_code=403,
+                detail="max keys limit reached"
+            )
         
         if user.get('secrets',None):
             user['secrets'][apikey]=client_sceret
         else:
             user['secrets']={apikey:client_sceret}
+
         
         ic(user.get('remove_branding',False))
         if not user.get('remove_branding',False):
             configurations['branding']='De-Buggers'
 
-        configurations['user_id']=email
+        configurations['user_email']=email
         ic(configurations)
         db.child(APIKEYS_CHILD_NAME).child(apikey).set(configurations)
         db.child(USER_CHILD_NAME).child(email_key).set(user)
+
         return "Api key added successfully"
     
+    except HTTPException:
+        raise
+
     except Exception as e:
         ic(f"something went wrong while adding apikey {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while adding apikey {e}"
+        )
 
 def revoke_secrets(email:str,old_apikey:str,new_apikey:str,new_client_secret:str):
     try:
@@ -57,11 +86,17 @@ def revoke_secrets(email:str,old_apikey:str,new_apikey:str,new_client_secret:str
 
         user=db.child(USER_CHILD_NAME).child(email_key).get().val()
         if not user:
-            return "User not found"
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
         
-        secrets=user.get('secrets',{})
+        secrets:dict=user.get('secrets',{})
         if not secrets.get(old_apikey,None):
-            return "Old apikey not found"
+            raise HTTPException(
+                status_code=404,
+                detail="Apikey not found"
+            )
         
         del secrets[old_apikey]
 
@@ -80,19 +115,32 @@ def revoke_secrets(email:str,old_apikey:str,new_apikey:str,new_client_secret:str
 
         return "Api key revoked successfully"
     
+    except HTTPException:
+        raise
+
     except Exception as e:
         ic(f"something went wrong while revoking apikey {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while revoking apikey {e}"
+        )
 
 def remove_apikey(email:str,apikey:str):
     try:
         email_key=email_key_generator(email)
         user=db.child(USER_CHILD_NAME).child(email_key).get().val()
         if not user:
-            return "User not found"
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
         
         secrets=user.get('secrets',{})
         if not secrets.get(apikey,None):
-            return "Apikey not found"
+            raise HTTPException(
+                status_code=404,
+                detail="Apikey not found"
+            )
         
         del secrets[apikey]
 
@@ -100,8 +148,16 @@ def remove_apikey(email:str,apikey:str):
         db.child(USER_CHILD_NAME).child(email_key).set(user)
         db.update({f"{APIKEYS_CHILD_NAME}/{apikey}": None})  # atomic del
         return "Api key removed successfully"
+    
+    except HTTPException:
+        raise
+
     except Exception as e:
         ic(f"something went wrong while removing apikey {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while removing apikey {e}"
+        )
 
 def update_cofigurations(email:str,apikey:str,new_configurations:Configuration):
     try:
@@ -117,14 +173,14 @@ def update_cofigurations(email:str,apikey:str,new_configurations:Configuration):
         if not secrets.get(apikey,None):
             raise HTTPException(
                 status_code=404,
-                detail="api key not found"
+                detail="Api key not found"
             )
         
         ic(user.get('remove_branding',False))
         if not user.get('remove_branding',False):
             new_configurations['branding']='De-Buggers'
 
-        new_configurations['user_id']=email
+        new_configurations['user_email']=email
         
         ic(new_configurations)
         update={
@@ -150,7 +206,10 @@ def delete_user(user_email:str):
         email_key=email_key_generator(user_email)
         user_data = db.child(USER_CHILD_NAME).child(email_key).get().val()
         if not user_data:
-            return "User not found"
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
 
         apikey = user_data.get("apikey")
         updates = {
@@ -163,8 +222,15 @@ def delete_user(user_email:str):
 
         return "User deleted successfully"
     
+    except HTTPException:
+        raise
+
     except Exception as e:
         ic(f"something went wrong while deleting user {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while deleting user {e}"
+        )
 
 def get_user_by_email(user_email:str):
     try:
@@ -172,8 +238,16 @@ def get_user_by_email(user_email:str):
         user=db.child(USER_CHILD_NAME).child(email_key).get().val()
         ic(user,email_key)
         return user
+    
+    except HTTPException:
+        raise
+
     except Exception as e:
         ic(f"something went wrong while get user by id {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while get user by id {e}"
+        )
 
 def get_user_secrets(user_email:str):
     try:
@@ -181,11 +255,11 @@ def get_user_secrets(user_email:str):
         user=db.child(USER_CHILD_NAME).child(email_key).get().val()
         ic(user,email_key)
         final_secrets=[]
-        secrets=user.get('secrets',[])
+        secrets:dict=user.get('secrets',{})
         for apikey,client_secret in secrets.items():
             config=db.child(APIKEYS_CHILD_NAME).child(apikey).get().val()
             ic(apikey,client_secret,config)
-            del config['user_id']
+            del config['user_email']
             final_secrets.append(
                 {
                     'apikey':apikey,
@@ -196,25 +270,48 @@ def get_user_secrets(user_email:str):
         branding=user.get('remove_branding',False)
 
         return {'secrets':final_secrets,'branding':branding}
+    
+    except HTTPException:
+        raise
+
     except Exception as e:
         ic(f"something went wrong while get user by id {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while get user by id {e}"
+        )
 
 def get_all_users():
     try:
         return db.child(USER_CHILD_NAME).get().val()
     except Exception as e:
         ic(f"something went wrong while getting all users")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while getting all users"
+        )
 
 def check_apikey_exists(apikey:str):
     try:
         is_present=db.child(APIKEYS_CHILD_NAME).child(apikey).get().val()
 
         if not is_present:
-            return False
+            raise HTTPException(
+                status_code=404,
+                detail="Api key doesn't exists"
+            )
         ic(is_present)
         return is_present
+    
+    except HTTPException:
+        raise
+
     except Exception as e:
         ic(f"something went wrong while checking apikey {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong while checking apikey {e}"
+        )
 
 
 def create_debuggers_cred(base_url:str):
@@ -243,6 +340,12 @@ def create_debuggers_cred(base_url:str):
 
         return "Debuggers Credentials Created Successfully"
     
+    except HTTPException:
+        raise
+
     except Exception as e:
         ic(f"something went wrong creating debuggers cred : {e}")
-        raise
+        raise HTTPException(
+            status_code=500,
+            detail=f"something went wrong creating debuggers cred : {e}"
+        )

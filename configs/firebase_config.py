@@ -11,5 +11,3 @@ firebase_config = json.loads(FIREBASE_CONFIG)
 pb=pyrebase.initialize_app(config=firebase_config)
 
 db=pb.database()
-
-

@@ -1,8 +1,11 @@
 from fastapi import FastAPI,Request
-from api.routers import user_crud
-from api.routers.authentication_crud import otp_auth,google_auth,github_auth,facebook_auth
-from fb_database.operations.users_crud import create_debuggers_cred,ic
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+from api.routers import deb_user_routes,auth_routes
+from api.routers.auth_providers_routes import otp_auth,google_auth,github_auth,facebook_auth
+from operations.fb_operations.users_crud import create_debuggers_cred,ic
 from starlette.middleware.cors import CORSMiddleware
+from exceptions import session_exp
 import sys
 
 if sys.platform!='win32':
@@ -20,12 +23,10 @@ def lifespan(app : FastAPI):
 
 app=FastAPI(lifespan=lifespan)
 
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:8000",
-    "https://xr84gnz1-8000.inc1.devtunnels.ms"
-]
+# adding custom exceptions
+app.add_exception_handler(session_exp.SessionExpired,session_exp.session_exp_handler)
+
+origins = []
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,16 +36,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# DeB Users Authentication Service
-app.include_router(user_crud.router)
+# DeB Users Routes
+app.include_router(deb_user_routes.router)
 
-# Client Authentication services
+
+# Authentication Acess Route
+app.include_router(auth_routes.router)
+
+
+# Authentication Methods Routes
 app.include_router(otp_auth.router)
 app.include_router(google_auth.router)
 app.include_router(github_auth.router)
 app.include_router(facebook_auth.router)
 
+
+template=Jinja2Templates("templates")
 @app.get("/")
 def root(request:Request):
     print({"message": "Welcome to DeB Users Authentication Service","Headers":request.cookies})
-    return {"message": "Welcome to DeB Users Authentication Service","Headers":request.cookies}
+    return RedirectResponse(url="http://localhost:5173/",status_code=302)
+    # retu rn {"message": "Welcome to DeB Users Authentication Service","Headers":request.cookies}

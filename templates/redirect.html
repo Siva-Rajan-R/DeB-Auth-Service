@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Returning to Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+    
+    .cyber-grid {
+      background-image: 
+        linear-gradient(rgba(139, 92, 246, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(139, 92, 246, 0.1) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    
+    .spin {
+      animation: spin 2s linear infinite;
+    }
+    
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+<body class="h-screen bg-black cyber-grid flex items-center justify-center p-4">
+  <div class="w-full max-w-sm text-center">
+    <!-- Animated Icon -->
+    <div class="w-16 h-16 mx-auto mb-6 rounded-full bg-gradient-to-r from-purple-600/20 to-cyan-600/20 flex items-center justify-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-cyan-400 spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    </div>
+    
+    <!-- Message -->
+    <h2 class="text-xl font-bold text-white mb-2">
+      {{ error_msg }}
+    </h2>
+    <p class="text-gray-400 text-sm">
+      Please wait while we redirect you
+    </p>
+    
+    <!-- Small loading text -->
+    <p class="text-xs text-gray-600 mt-6">
+      Redirecting in <span id="countdown">3</span> seconds
+    </p>
+    
+    <!-- Footer -->
+    <div class="mt-8">
+      <span class="text-xs text-gray-700">Powered by 
+        <span class="font-bold text-cyan-500">De-Buggers</span>
+      </span>
+    </div>
+  </div>
+
+  <script>
+    // Countdown and redirect
+    let countdown = 3;
+    const countdownElement = document.getElementById('countdown');
+    
+    const countdownInterval = setInterval(() => {
+      countdown--;
+      countdownElement.textContent = countdown;
+      
+      if (countdown <= 0) {
+        clearInterval(countdownInterval);
+        window.location.href = "{{ redirect_url }}";
+      }
+    }, 1000);
+  </script>
+</body>
+</html>

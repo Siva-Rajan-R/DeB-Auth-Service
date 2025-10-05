@@ -52,6 +52,7 @@
   </script>
 </head>
 <body class="h-screen bg-black cyber-grid flex items-center justify-center p-4">
+  
   <div class="w-full max-w-md bg-gradient-to-br from-gray-900 to-black border border-purple-500/30 rounded-2xl shadow-2xl p-6 md:p-8 glow-effect">
     
     <!-- Header -->
@@ -65,26 +66,26 @@
     <!-- OTP Form -->
     <form method="post" action="/auth/login/verify" class="space-y-6">
       <!-- Hidden auth_id -->
-      <input type="hidden" name="auth_id" value="{{ auth_id }}"/>
+      <input type="hidden" name="auth_token" value="{{ auth_token }}"/>
 
       <!-- OTP 6 Boxes -->
-      <div class="flex justify-between space-x-2">
-        <input id="otp1" type="text" maxlength="1" name="otp1"
+      <div class="flex justify-between">
+        <input id="otp1" type="number" maxlength="1" name="otp1"
           class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp2')" onpaste="handlePaste(event)" />
-        <input id="otp2" type="text" maxlength="1" name="otp2"
+        <input id="otp2" type="number" maxlength="1" name="otp2"
           class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp3')" onkeydown="if(event.key==='Backspace') movePrev(this,'otp1')" />
-        <input id="otp3" type="text" maxlength="1" name="otp3"
+        <input id="otp3" type="number" maxlength="1" name="otp3"
           class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp4')" onkeydown="if(event.key==='Backspace') movePrev(this,'otp2')" />
-        <input id="otp4" type="text" maxlength="1" name="otp4"
+        <input id="otp4" type="number" maxlength="1" name="otp4"
           class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp5')" onkeydown="if(event.key==='Backspace') movePrev(this,'otp3')" />
-        <input id="otp5" type="text" maxlength="1" name="otp5"
+        <input id="otp5" type="number" maxlength="1" name="otp5"
           class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           oninput="moveNext(this,'otp6')" onkeydown="if(event.key==='Backspace') movePrev(this,'otp4')" />
-        <input id="otp6" type="text" maxlength="1" name="otp6"
+        <input id="otp6" type="number" maxlength="1" name="otp6"
           class="w-12 h-12 bg-gray-800 border border-gray-700 rounded-xl text-center text-lg font-mono text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           onkeydown="if(event.key==='Backspace') movePrev(this,'otp5')" />
       </div>

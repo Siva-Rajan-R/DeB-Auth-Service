@@ -37,7 +37,7 @@
     <!-- Form -->
     <form {% if is_preview %} onsubmit="return false" {% else %} method="post" action="/auth/login/otp" {% endif %}  class="space-y-6">
       <!-- Hidden auth_id -->
-      <input type="hidden" name="auth_id" value="{{ auth_id }}"/>
+      <input type="hidden" name="auth_token" value="{{ auth_token }}"/>
 
       <!-- Email -->
       <div>
@@ -72,7 +72,7 @@
       {% if 'google' in auth_methods %}
       <!-- Google -->
       <button
-        {% if not is_preview %} onclick="window.location.href='/auth/google/login/{{ auth_id }}'" {% endif %}
+        {% if not is_preview %} onclick="window.location.href='/auth/google/login/{{ auth_token }}'" {% endif %}
         class="flex items-center justify-center bg-gray-800 border border-gray-700 p-3 rounded-xl hover:bg-gray-700 transition-all shadow-md font-medium text-white w-fit">
         <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="w-5 h-5 rounded-2xl"/>
         <span class="max-sm:hidden text-gray-300 ml-2">Google</span>
@@ -82,7 +82,7 @@
        {% if 'github' in auth_methods %}
       <!-- Github -->
       <button
-        {% if not is_preview %} onclick="window.location.href='/auth/github/login/{{ auth_id }}'" {% endif %}
+        {% if not is_preview %} onclick="window.location.href='/auth/github/login/{{ auth_token }}'" {% endif %}
         class="flex items-center justify-center bg-gray-800 border border-gray-700 p-3 rounded-xl hover:bg-gray-700 transition-all shadow-md font-medium text-white w-fit">
         <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="Github" class="w-5 h-5 rounded-2xl"/>
         <span class="max-sm:hidden text-gray-300 ml-2">GitHub</span>
@@ -92,7 +92,7 @@
        {% if 'facebook' in auth_methods %}
       <!-- Facebook -->
       <button
-        {% if not is_preview %} onclick="window.location.href='/auth/facebook/login/{{ auth_id }}'" {% endif %}
+        {% if not is_preview %} onclick="window.location.href='/auth/facebook/login/{{ auth_token }}'" {% endif %}
         class="flex items-center justify-center bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all shadow-md font-medium text-white w-fit p-3">
         <img src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png" alt="Facebook" class="w-5 h-5 rounded-2xl"/>
         <span class="max-sm:hidden text-gray-300 ml-2">Facebook</span>
