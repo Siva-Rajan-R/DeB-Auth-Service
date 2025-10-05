@@ -86,7 +86,7 @@ async def create_users(request:Request,res:Response,code:Optional[str]=None):
     ic(encrypted_data)
     token=generate_jwt_token(data={'data':encrypted_data},exp_min=15,alg=DEB_USER_JWT_ALGORITHM,key=DEB_USER_JWT_KEY)
     ic(token)
-    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}',status_code=302,headers={})
+    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}',status_code=302)
     response.set_cookie(key="token",value=token,httponly=True,samesite="none",secure=True)
     return response
 
@@ -151,7 +151,8 @@ def delete_users(user_email:EmailStr):
     return delete_user(user_email=user_email)
 
 @router.delete("/user/logout")
-def logout(response:Response):
+def logout(response:Response,req:Request):
+    ic(req.cookies.get("token"))
     response.delete_cookie(key="token",httponly=True,samesite="none",secure=True)
     return {"message": "Logged out successfully"}
 
