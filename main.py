@@ -6,7 +6,9 @@ from api.routers.auth_providers_routes import otp_auth,google_auth,github_auth,f
 from operations.fb_operations.users_crud import create_debuggers_cred,ic
 from starlette.middleware.cors import CORSMiddleware
 from exceptions import session_exp
-import sys
+import sys,os
+from dotenv import load_dotenv
+load_dotenv()
 
 if sys.platform!='win32':
     import uvloop,asyncio
@@ -55,5 +57,5 @@ template=Jinja2Templates("templates")
 @app.get("/")
 def root(request:Request):
     print({"message": "Welcome to DeB Users Authentication Service","Headers":request.cookies})
-    return RedirectResponse(url="https://authdebuggers.vercel.app/",status_code=302)
+    return RedirectResponse(url=os.getenv("FRONTEND_URL"),status_code=302)
     # retu rn {"message": "Welcome to DeB Users Authentication Service","Headers":request.cookies}
