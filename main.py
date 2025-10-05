@@ -28,7 +28,7 @@ app=FastAPI(lifespan=lifespan)
 # adding custom exceptions
 app.add_exception_handler(session_exp.SessionExpired,session_exp.session_exp_handler)
 
-frontend_origins = ["https://authdebuggers.vercel.app"]
+frontend_origins = ["https://authdebuggers.vercel.app","http://localhost:5173"]
 
 app.add_middleware(
     CORSMiddleware,
