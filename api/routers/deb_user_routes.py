@@ -87,9 +87,7 @@ async def create_users(request:Request,res:Response,code:Optional[str]=None):
     token=generate_jwt_token(data={'data':encrypted_data},exp_min=15,alg=DEB_USER_JWT_ALGORITHM,key=DEB_USER_JWT_KEY)
     ic(token)
     response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}',status_code=302,headers={})
-    res.set_cookie(key="siva",value="jeeva")
-    res.set_cookie(key="jeva",value="aiv",httponly=True)
-    response.set_cookie(key="token",value=token,httponly=True,samesite="lax",secure=False)
+    response.set_cookie(key="token",value=token,httponly=True,samesite="none",secure=True)
     return response
 
 @router.post("/user/secrets")
