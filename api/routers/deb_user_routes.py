@@ -132,8 +132,8 @@ def update_apikey_configurations(inp:UpdateConfigSchema,user_email:str=Depends(v
 
 
 @router.get("/user/secrets")
-def get_user_by_pk(user_email:str=Depends(verify_user)):
-    ic(user_email)
+def get_user_by_pk(request:Request,user_email:str="siva967763@gmail.com"):
+    ic(user_email,request.cookies,request.cookies.get("token"))
     user=get_user_secrets(user_email=user_email)
     return user
 
