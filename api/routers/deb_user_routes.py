@@ -56,7 +56,7 @@ async def create_users(request:Request,code:Optional[str]=None):
     ic(code)
     if not code:
         raise SessionExpired(
-            redirect_url="http://localhost:5173/",
+            redirect_url="https://authdebuggers.vercel.app/",
             message="Authentication Falied redirecting to DeB-Auth-Service"
         )
     
@@ -85,7 +85,7 @@ async def create_users(request:Request,code:Optional[str]=None):
     ic(encrypted_data)
     token=generate_jwt_token(data={'data':encrypted_data},exp_min=15,alg=DEB_USER_JWT_ALGORITHM,key=DEB_USER_JWT_KEY)
     ic(token)
-    response=RedirectResponse(url=f'http://localhost:5173/?profile={auth_user['profile_picture']}&name={auth_user['name']}',status_code=302,headers={})
+    response=RedirectResponse(url=f'https://authdebuggers.vercel.app/?profile={auth_user['profile_picture']}&name={auth_user['name']}',status_code=302,headers={})
     response.set_cookie(key="token",value=token,httponly=True,samesite="none",secure=True)
     return response
 

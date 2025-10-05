@@ -55,5 +55,5 @@ template=Jinja2Templates("templates")
 @app.get("/")
 def root(request:Request):
     print({"message": "Welcome to DeB Users Authentication Service","Headers":request.cookies})
-    return RedirectResponse(url="http://localhost:5173/",status_code=302)
+    return RedirectResponse(url="https://authdebuggers.vercel.app/",status_code=302)
     # retu rn {"message": "Welcome to DeB Users Authentication Service","Headers":request.cookies}
