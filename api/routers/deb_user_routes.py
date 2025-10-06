@@ -87,7 +87,8 @@ async def create_users(request:Request,res:Response,code:Optional[str]=None):
     token=generate_jwt_token(data={'data':encrypted_data},exp_min=15,alg=DEB_USER_JWT_ALGORITHM,key=DEB_USER_JWT_KEY)
     ic(token)
     response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}',status_code=302)
-    response.set_cookie(key="token",value=token,httponly=True,samesite="none",secure=True)
+    response.set_cookie(key="token",value=token,httponly=True,samesite="none",secure=True,domain="authdebuggers.vercel.app")
+    ic(response)
     return response
 
 @router.post("/user/secrets")
@@ -132,7 +133,7 @@ def update_apikey_configurations(inp:UpdateConfigSchema,user_email:str=Depends(v
 
 
 @router.get("/user/secrets")
-def get_user_by_pk(request:Request,user_email:str="siva967763@gmail.com"):
+def get_user_by_pk(request:Request,user_email:str=Depends(verify_user)):
     ic(user_email,request.cookies,request.cookies.get("token"))
     user=get_user_secrets(user_email=user_email)
     return user
@@ -153,7 +154,7 @@ def delete_users(user_email:EmailStr):
 @router.delete("/user/logout")
 def logout(response:Response,req:Request):
     ic(req.cookies.get("token"))
-    response.delete_cookie(key="token",httponly=True,samesite="none",secure=True)
+    response.delete_cookie(key="token",httponly=True,samesite="none",secure=True,domain="authdebuggers.vercel.app")
     return {"message": "Logged out successfully"}
 
 @router.get('/user/auth/preview')
