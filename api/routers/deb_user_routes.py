@@ -89,7 +89,7 @@ async def create_users(request:Request,res:Response,code:Optional[str]=None):
     response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}')
     response.set_cookie(key="token",value=token,httponly=True,samesite='none',secure=True)
     ic(response.headers,response.__dict__)
-    return {"redirect_url":f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}'}
+    # return {"redirect_url":f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}'}
     return response
 
 @router.post("/user/secrets")
