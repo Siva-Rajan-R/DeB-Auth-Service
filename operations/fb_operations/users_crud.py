@@ -334,7 +334,7 @@ def create_debuggers_cred(base_url:str):
             configurations=Configuration(
                 auth_methods=[AuthMethods.otp,AuthMethods.google,AuthMethods.github],
                 branding="De-Buggers",
-                redirect_url=f"{os.getenv("REDIRECT_BASEURL")}/user/create"
+                redirect_url=f"https://deb-auth-api.onrender.com/user/create"
             )
         )
 

@@ -1,8 +1,16 @@
-import secrets
-from uuid import uuid4
-print(secrets.token_urlsafe(32))
-print(secrets.token_urlsafe(64))
-print(uuid4())
+from fastapi_testrunner import TestFastAPIRoutes,CustomInputFormat
+
+test=TestFastAPIRoutes(
+    custom_input=CustomInputFormat(
+        method="post",
+        path="/auth",
+        isfor_json=True,
+        isfor_params=False,
+        data={'apikey':'DeB-hgDOF7xgIytpII36f_SUJO8aZXTAzOZRP0T2kDZTTZE'}
+    ),
+    routes_tocheck=['/auth']
+)
+test.start_test()
 
     
     

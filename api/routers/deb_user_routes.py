@@ -86,9 +86,10 @@ async def create_users(request:Request,res:Response,code:Optional[str]=None):
     ic(encrypted_data)
     token=generate_jwt_token(data={'data':encrypted_data},exp_min=15,alg=DEB_USER_JWT_ALGORITHM,key=DEB_USER_JWT_KEY)
     ic(token)
-    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}',status_code=302)
-    response.set_cookie(key="token",value=token,httponly=True,samesite="none",secure=True)
-    ic(response)
+    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}')
+    response.set_cookie(key="token",value=token,httponly=True,samesite='none',secure=True)
+    ic(response.headers,response.__dict__)
+    return {"redirect_url":f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}'}
     return response
 
 @router.post("/user/secrets")
@@ -147,7 +148,7 @@ def get_users():
         )
     return get_all_users()
 
-@router.delete("/users")
+@router.delete("/user")
 def delete_users(user_email:EmailStr):
     return delete_user(user_email=user_email)
 
@@ -177,3 +178,8 @@ def get_user_login_page(apikey:str,request:Request):
             "branding":config.get('branding',"De-Buggers")
         }
     )
+
+@router.get("/sample/{id}/user")
+def sample(req:Request,id:str):
+
+    return id,req.path_params

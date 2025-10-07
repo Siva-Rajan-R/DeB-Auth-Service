@@ -1,0 +1,136 @@
+-------------------------------------------------- FASTAPI TESTING BY DE-BUGGERS --------------------------------------------------
+Date : 2025-10-06 Time : 14:39:36.231080
+
+Paths/Routes to test -> : ['/user/auth', '/user/create', '/user/secrets', '/user/secrets/revoke', '/user/secrets/remove', 
+'/user/secrets/config', '/users', '/user', '/user/logout', '/user/auth/preview', '/auth', '/auth/login/{auth_id}', 
+'/auth/authenticated-user', '/auth/login/otp', '/auth/login/verify', '/auth/google/login/{auth_token}', '/auth/google/callback', 
+'/auth/github/login/{auth_token}', '/auth/github/callback', '/auth/facebook/login/{auth_token}', '/auth/facebook/callback', '/'] 22
+Paths/Routes
+
+
+
+-> GET http://127.0.0.1:8000/user/auth Inputs (JSON DATA) -> None -> 200
+Result : {"login_url":"http://127.0.0.1:8000/auth/login/0dd4fa9f-efcc-5bc8-89c7-2e499bc15c06"}
+
+
+
+-> GET http://127.0.0.1:8000/user/create Inputs (QUERY DATA) -> {'code': 'De-Buggers'} -> 404
+Result : {"detail":"invalid code"}
+
+
+
+-> GET http://127.0.0.1:8000/user/secrets Inputs (JSON DATA) -> None -> 401
+Result : {"detail":{"msg":"token not found","logout":true}}
+
+
+
+-> POST http://127.0.0.1:8000/user/secrets Inputs (JSON DATA) -> {'redirect_url': 'De-Buggers', 'branding': 'De-Buggers', 
+'auth_methods': ['facebook', 'facebook', 'facebook', 'facebook', 'facebook']} -> 401
+Result : {"detail":{"msg":"token not found","logout":true}}
+
+
+
+-> PUT http://127.0.0.1:8000/user/secrets/revoke Inputs (JSON DATA) -> {'apikey': 'De-Buggers'} -> 401
+Result : {"detail":{"msg":"token not found","logout":true}}
+
+
+
+-> DELETE http://127.0.0.1:8000/user/secrets/remove Inputs (QUERY DATA) -> {'apikey': 'De-Buggers'} -> 401
+Result : {"detail":{"msg":"token not found","logout":true}}
+
+
+
+-> PUT http://127.0.0.1:8000/user/secrets/config Inputs (JSON DATA) -> {'apikey': 'De-Buggers', 'config': {'redirect_url': 
+'De-Buggers', 'branding': 'De-Buggers', 'auth_methods': ['facebook', 'facebook', 'facebook', 'facebook', 'facebook']}} -> 401
+Result : {"detail":{"msg":"token not found","logout":true}}
+
+
+
+-> GET http://127.0.0.1:8000/users Inputs (JSON DATA) -> None -> 200
+Result : 
+{"debuggers437_at_gmail_com":{"email":"debuggers437@gmail.com","max_keys":2,"name":"DeB-Auth-System","remove_branding":true,"secret
+s":{"DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk":"DeB-Secret-HGMtn1SEIoNdNpmE4EPITiw6SYlJgKWJZs3iCCqE0mjCyWt_hIqNvSBBqy4l_OgeO
+2kFFQ5i3MufZo-d9LCVUA"}},"guruvudhasanserver_at_gmail_com":{"email":"guruvudhasanserver@gmail.com","max_keys":2,"name":"Guruvudhasa
+n 
+Server","remove_branding":false,"secrets":{"DeB-iEXd7RyKYkQqHZk9Dp0rEhaLfb2nXiB3VBwB9gjEQ4I":"DeB-Secret-020LRyp8fO4t-zUXMU9rPJFwgl
+x757c9agz9yhi2DrMQ4E2zaGdZz3N3XXlonofuXOaG3V6c06UJuUv_SULaMw"}},"siva967763_at_gmail_com":{"email":"siva967763@gmail.com","max_keys
+":2,"name":"Nothing","remove_branding":true,"secrets":{"DeB-hgDOF7xgIytpII36f_SUJO8aZXTAzOZRP0T2kDZTTZE":"DeB-Secret-Zs-ksTA0XyN9Wm
+snYvN1M9D8lnwr2S5tFnhVoXA1wil-0v1ga8VPOUJ9F_t4Dmt__vuOodPsuy66XYeB3LbweQ","DeB-ySryE1m_JYEGyf_rs7iIg9a_Gu_1O1B7rBFK77pOh40":"DeB-Se
+cret-QMOlzY9ohSNEVtxDOPee4hdoBma0-lCPyTFKrspfUfoWdwsj4Nj7LFHvythx0wZolCXbHGsDz83v7lqDZvyvhw"}}}
+
+
+
+-> DELETE http://127.0.0.1:8000/user Inputs (QUERY DATA) -> {'user_email': 'debuggers@gmail.com'} -> 404
+Result : {"detail":"User not found"}
+
+
+
+-> DELETE http://127.0.0.1:8000/user/logout Inputs (JSON DATA) -> None -> 200
+Result : {"message":"Logged out successfully"}
+
+
+
+-> GET http://127.0.0.1:8000/user/auth/preview Inputs (QUERY DATA) -> {'apikey': 'De-Buggers'} -> 404
+Result : {"detail":"Api key doesn't exists"}
+
+
+
+-> POST http://127.0.0.1:8000/auth Inputs (JSON DATA) -> {'apikey': 'De-Buggers'} -> 404
+Result : {"detail":"Api key doesn't exists"}
+
+
+
+-> GET http://127.0.0.1:8000/auth/login/{auth_id} Inputs (QUERY DATA) -> {'auth_id': 'De-Buggers'} -> 404
+Result : {"detail":"Auth id not found"}
+
+
+
+-> POST http://127.0.0.1:8000/auth/authenticated-user Inputs (JSON DATA) -> {'code': 'De-Buggers', 'client_secret': 'De-Buggers'} 
+-> 404
+Result : {"detail":"invalid code"}
+
+
+
+-> POST http://127.0.0.1:8000/auth/login/otp Inputs (FORM DATA) -> {'email': 'debuggers@gmail.com', 'fullname': 'De-Buggers', 
+'auth_token': 'De-Buggers'} -> 401
+Result : {'DeB-FastApi-Test-Response': 'Binary response (Image,Video,Audio,File,HTML...)'}
+
+
+
+-> POST http://127.0.0.1:8000/auth/login/verify Inputs (FORM DATA) -> {'auth_token': 'De-Buggers', 'otp': 'De-Buggers'} -> 401
+Result : {'DeB-FastApi-Test-Response': 'Binary response (Image,Video,Audio,File,HTML...)'}
+
+
+
+-> GET http://127.0.0.1:8000/auth/google/login/{auth_token} Inputs (QUERY DATA) -> {'auth_token': 'De-Buggers'} -> 401
+Result : {'DeB-FastApi-Test-Response': 'Binary response (Image,Video,Audio,File,HTML...)'}
+
+
+
+-> GET http://127.0.0.1:8000/auth/google/callback Inputs (QUERY DATA) -> {'code': 'De-Buggers', 'state': 'De-Buggers'} -> 401
+Result : {'DeB-FastApi-Test-Response': 'Binary response (Image,Video,Audio,File,HTML...)'}
+
+
+
+-> GET http://127.0.0.1:8000/auth/github/login/{auth_token} Inputs (QUERY DATA) -> {'auth_token': 'De-Buggers'} -> 401
+Result : {'DeB-FastApi-Test-Response': 'Binary response (Image,Video,Audio,File,HTML...)'}
+
+
+
+-> GET http://127.0.0.1:8000/auth/github/callback Inputs (QUERY DATA) -> {'code': 'De-Buggers', 'state': 'De-Buggers'} -> 401
+Result : {'DeB-FastApi-Test-Response': 'Binary response (Image,Video,Audio,File,HTML...)'}
+
+
+
+-> GET http://127.0.0.1:8000/auth/facebook/login/{auth_token} Inputs (QUERY DATA) -> {'auth_token': 'De-Buggers'} -> 401
+Result : {'DeB-FastApi-Test-Response': 'Binary response (Image,Video,Audio,File,HTML...)'}
+
+
+
+-> GET http://127.0.0.1:8000/auth/facebook/callback Inputs (QUERY DATA) -> {'code': 'De-Buggers', 'state': 'De-Buggers'} -> 401
+Result : {'DeB-FastApi-Test-Response': 'Binary response (Image,Video,Audio,File,HTML...)'}
+
+
+
+-> GET http://127.0.0.1:8000/ Inputs (JSON DATA) -> None -> 200
+Result : {'DeB-FastApi-Test-Response': 'Binary response (Image,Video,Audio,File,HTML...)'}

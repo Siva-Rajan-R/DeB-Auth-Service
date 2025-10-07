@@ -1,0 +1,9 @@
+-------------------------------------------------- FASTAPI TESTING BY DE-BUGGERS --------------------------------------------------
+Date : 2025-10-06 Time : 14:44:31.545816
+
+Paths/Routes to test -> : ['/auth'] 1 Paths/Routes
+
+
+
+-> POST http://127.0.0.1:8000/auth Inputs (JSON DATA) -> {'apikey': 'DeB-hgDOF7xgIytpII36f_SUJO8aZXTAzOZRP0T2kDZTTZE'} -> 200
+Result : {"login_url":"http://127.0.0.1:8000/auth/login/caadf5a4-0b43-5d03-b210-c24cb385fe98"}
