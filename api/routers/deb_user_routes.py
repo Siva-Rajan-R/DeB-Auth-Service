@@ -1,5 +1,6 @@
 from fastapi import APIRouter,Request,HTTPException,Depends
-from api.dependencies.verify import verify_user
+from api.dependencies.token_verification import verify_user
+from api.dependencies.token_revocation import revoke_user
 from fastapi.responses import RedirectResponse,Response
 from security.unique_id import generate_unique_id
 from security.api_key import generate_api_key
@@ -40,6 +41,8 @@ class UpdateConfigSchema(BaseModel):
 
 DEB_USER_JWT_ALGORITHM=os.getenv("DEB_USER_JWT_ALGORITHM","HS256")
 DEB_USER_JWT_KEY=os.getenv("DEB_USER_JWT_KEY")
+DEB_USER_REFRESH_JWT_ALGORITHM=os.getenv("DEB_USER_REFRESH_JWT_ALGORITHM")
+DEB_USER_REFRESH_KEY=os.getenv("DEB_USER_REFRESH_KEY")
 
 @router.get("/user/auth")
 async def user_auth(request:Request):
@@ -84,10 +87,12 @@ async def create_users(request:Request,res:Response,code:Optional[str]=None):
     ic(json_formatted)
     encrypted_data=encrypt_data(json_formatted)
     ic(encrypted_data)
-    token=generate_jwt_token(data={'data':encrypted_data},exp_min=15,alg=DEB_USER_JWT_ALGORITHM,key=DEB_USER_JWT_KEY)
+    access_token=generate_jwt_token(data={'data':encrypted_data},exp_min=15,alg=DEB_USER_JWT_ALGORITHM,key=DEB_USER_JWT_KEY)
+    refresh_token=generate_jwt_token(data={'data':encrypted_data},exp_days=5,alg=DEB_USER_REFRESH_JWT_ALGORITHM,key=DEB_USER_REFRESH_KEY)
     ic(token)
-    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}')
-    response.set_cookie(key="token",value=token,httponly=True,samesite='none',secure=True)
+    
+    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}&access_token={access_token}&refresh_token={refresh_token}',status_code=302)
+    # response.set_cookie(key="token",value=token,httponly=True,samesite='none',secure=True)
     ic(response.headers,response.__dict__)
     # return {"redirect_url":f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}'}
     return response
@@ -179,7 +184,9 @@ def get_user_login_page(apikey:str,request:Request):
         }
     )
 
-@router.get("/sample/{id}/user")
-def sample(req:Request,id:str):
-
-    return id,req.path_params
+@router.get("/user/token")
+def get_new_token(req:Request,new_token:bool=Depends(revoke_user)):
+    ic(new_token)
+    return {
+        'access_token':new_token
+    }

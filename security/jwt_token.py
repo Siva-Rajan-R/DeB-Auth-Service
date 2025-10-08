@@ -4,6 +4,7 @@ from jwt.exceptions import InvalidTokenError,ExpiredSignatureError
 from datetime import datetime,timedelta,timezone
 from dotenv import load_dotenv
 import os
+from icecream import ic
 load_dotenv()
 
 
@@ -32,12 +33,14 @@ def verfiy_jwt_token(jwt_token:str,key:str=JWT_KEY,alg:str=JWT_ALG):
         return pyjwt_obj.decode(jwt=jwt_token,key=key,algorithms=alg)
     
     except InvalidTokenError:
+        ic({'msg':"Invalid token",'logout':True})
         raise HTTPException(
             status_code=401,
-            detail={'msg':"Invalid token or token expierd",'logout':True}
+            detail={'msg':"Invalid token",'logout':True}
         )
     
     except ExpiredSignatureError:
+        ic({'msg':"Invalid token or token expierd",'expired':True})
         raise HTTPException(
             status_code=401,
             detail={'msg':"Invalid token or token expierd",'logout':True}

@@ -18,7 +18,7 @@ if sys.platform!='win32':
 
 def lifespan(app : FastAPI):
     try:
-        ic(create_debuggers_cred("http://127.0.0.1:8000/"))
+        ic(create_debuggers_cred(os.getenv("REDIRECT_BASEURL")))
         yield
     except Exception as e:
         ic(e)

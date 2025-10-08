@@ -17,7 +17,7 @@ def decrypt_data(data:str)->str:
     try:
         return fernet_obj.decrypt(data.encode()).decode()
     except InvalidSignature:
-        return "invalid data"
+        return False
     except Exception as e:
         raise RuntimeError(f"something went wrong while decrypting data {e}")
     

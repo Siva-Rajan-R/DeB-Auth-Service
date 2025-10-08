@@ -334,7 +334,7 @@ def create_debuggers_cred(base_url:str):
             configurations=Configuration(
                 auth_methods=[AuthMethods.otp,AuthMethods.google,AuthMethods.github],
                 branding="De-Buggers",
-                redirect_url=f"http://127.0.0.1:8000/user/create"
+                redirect_url=f"{base_url}/user/create"
             )
         )
 
