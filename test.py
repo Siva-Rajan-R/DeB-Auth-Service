@@ -12,9 +12,9 @@
 # )
 # test.start_test()
 
-from secrets import token_urlsafe
+import secrets
 
-print(token_urlsafe(64))
+print(secrets.token_urlsafe(22))
     
 # 2401:4900:2346:e0ac:1:1:3976:2a26
 # 2409:408d:3c05:1061:286d:548e:737:4702
