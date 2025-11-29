@@ -26,8 +26,8 @@ orjson
 brotli
 brotli-asgi
 asyncpg
-gunicorn
+gunicorn ; platform_system!="Windows"
 jinja2
 pyrebase4
 itsdangerous
-uvloop
+uvloop ; platform_system!="Windows"

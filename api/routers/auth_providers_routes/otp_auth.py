@@ -37,7 +37,8 @@ async def otp_page(request:Request,bgt:BackgroundTasks,email:EmailStr=Form(...),
     
     otp=generate_otp()
     ic(otp)
-    bgt.add_task(main.send_email,otp_email.generate_otp_email_content(otp=otp),email,"Otp From DeB-Authentication Service")
+    email_content=otp_email.generate_otp_email_content(otp=otp)
+    bgt.add_task(main.send_email,recivers_email=[email],subject="Otp From DeB-Authentication Service",body=email_content,is_html=True)
     extended_dict={**auth_values,'email':email,'full_name':fullname,'otp':otp,'verify_count':0}
     ic(extended_dict)
     ttl=await redis_curttl(auth_id)
