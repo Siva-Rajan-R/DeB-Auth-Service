@@ -1,10 +1,10 @@
 from fastapi import APIRouter,HTTPException,Request
 from fastapi.responses import RedirectResponse
 from operations.fb_operations.users_crud import get_user_by_email
-from security.unique_id import generate_unique_id
-from security.otp import generate_otp
-from security.jwt_token import generate_jwt_token
-from security.jwt_token import generate_jwt_token
+from core.security.unique_id import generate_unique_id
+from core.security.otp import generate_otp
+from core.security.jwt_token import generate_jwt_token
+from core.security.jwt_token import generate_jwt_token
 from icecream import ic
 import secrets
 from hashlib import sha256
@@ -29,7 +29,7 @@ router=APIRouter(
 
 @router.get("/auth/facebook/login/{auth_token}")
 async def facebook_login(request:Request,auth_token:str):
-    verified_secret:dict=verify_url_secret(url_secret=auth_token,cur_ip=request.client.host) or {}
+    verified_secret:dict=verify_url_secret(url_secret=auth_token,request=request) or {}
     auth_id:str=verified_secret.get('auth_id')
     if not await redis_get(auth_id):
         ic("Invalid Auth Id")
@@ -54,7 +54,7 @@ async def facebook_login(request:Request,auth_token:str):
 async def facebook_callback(request:Request,code: str, state: str):
     auth_token=await redis_get(state) or ''
     await redis_unlink(state)
-    verified_secret:dict=verify_url_secret(url_secret=auth_token,cur_ip=request.client.host) or {}
+    verified_secret:dict=verify_url_secret(url_secret=auth_token,request=request) or {}
     auth_id:str=verified_secret.get('auth_id')
     
     if not auth_id:
@@ -98,5 +98,6 @@ async def facebook_callback(request:Request,code: str, state: str):
             'email':email,
             'name':name,
             'profile_picture':profile_pic
-        }
+        },
+        request=request
     )

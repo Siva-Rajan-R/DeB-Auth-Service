@@ -4,10 +4,14 @@ from typing import List,Optional
 from .enum_inputs import AuthMethods
 
 
-class Configuration(TypedDict):
-    redirect_url:str
-    branding:Optional[str]="De-Buggers"
-    auth_methods:List[AuthMethods]
+class Configuration(TypedDict, total=False):
+    project_name: Optional[str]
+    redirect_urls: dict
+    branding: Optional[str]
+    auth_methods: List[dict]
+    signup_fields: Optional[List[dict]]
+    sso: Optional[dict]
+    ui: Optional[dict]
 
 
 class User(TypedDict):

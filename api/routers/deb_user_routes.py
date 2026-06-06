@@ -2,16 +2,16 @@ from fastapi import APIRouter,Request,HTTPException,Depends
 from api.dependencies.token_verification import verify_user
 from api.dependencies.token_revocation import revoke_user
 from fastapi.responses import RedirectResponse,Response
-from security.unique_id import generate_unique_id
-from security.api_key import generate_api_key
+from core.security.unique_id import generate_unique_id
+from core.security.api_key import generate_api_key
 from pydantic import BaseModel,EmailStr
 from input_formats.dict_inputs import User,Configuration,AuthMethods
 from operations.fb_operations.users_crud import create_user,get_user_by_email,get_all_users,delete_user,create_secrets,revoke_secrets,remove_apikey,update_cofigurations,get_user_secrets,check_apikey_exists
 from .auth_routes import authenticate,get_authenticated_user,AuthSchema,AuthenticatedUserSchema
 from dotenv import load_dotenv
 import os,jwt,json
-from security.jwt_token import generate_jwt_token
-from security.sym_encrypt import encrypt_data
+from core.security.jwt_token import generate_jwt_token
+from core.security.sym_encrypt import encrypt_data
 from icecream import ic
 from typing import List,Optional
 from fastapi.templating import Jinja2Templates
@@ -129,7 +129,8 @@ def remove_user_apikey(apikey:str,user_email:str=Depends(verify_user)):
 @router.put('/user/secrets/config')
 def update_apikey_configurations(inp:UpdateConfigSchema,user_email:str=Depends(verify_user)):
 
-    if len(inp.config.get("auth_methods"))<=0:
+    enabled_methods = [m for m in inp.config.get("auth_methods", []) if m.get("enabled")]
+    if len(enabled_methods)<=0:
         raise HTTPException(
             status_code=422,
             detail="Choose atleast one auth method"

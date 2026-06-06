@@ -1,4 +1,5 @@
 from fastapi.exceptions import HTTPException
+from fastapi.requests import Request
 from itsdangerous import URLSafeSerializer
 import os
 from dotenv import load_dotenv
@@ -20,15 +21,22 @@ def generate_url_secret(data):
     except Exception as e:
         ic(f"something went wrong while generating url secret {e}")
 
-def verify_url_secret(url_secret:str,cur_ip:str):
+def verify_url_secret(url_secret:str,request:Request):
     try:
         url_decoded:dict=auth_s.loads(url_secret)
-        ic(cur_ip)
+        cur_ip = request.client.host
+        cur_browser = request.headers.get("User-Agent")
+        ic(cur_ip, cur_browser)
         ic(url_decoded)
         if not url_decoded.get('ip','')==cur_ip:
             raise HTTPException(
                 status_code=401,
-                detail="Your Network was interprutted"
+                detail="Your Network was interprutted (IP Mismatch)"
+            )
+        if url_decoded.get('browser','')!=cur_browser:
+            raise HTTPException(
+                status_code=401,
+                detail="Your Network was interprutted (Browser Mismatch)"
             )
         
         return url_decoded

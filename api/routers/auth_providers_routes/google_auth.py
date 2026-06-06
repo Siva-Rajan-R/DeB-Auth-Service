@@ -1,9 +1,9 @@
 from fastapi import APIRouter,HTTPException,Request
 from fastapi.responses import RedirectResponse
 from operations.fb_operations.users_crud import get_user_by_email
-from security.unique_id import generate_unique_id
-from security.jwt_token import generate_jwt_token
-from security.jwt_token import generate_jwt_token
+from core.security.unique_id import generate_unique_id
+from core.security.jwt_token import generate_jwt_token
+from core.security.jwt_token import generate_jwt_token
 import jwt
 from icecream import ic
 import secrets
@@ -18,6 +18,8 @@ from utils.redirectcode_genereator import generate_redirect_code
 from operations.redis_operations.handlers import redis_set,redis_get,redis_unlink,redis_curttl
 from exceptions.session_exp import SessionExpired
 from utils.url_secret_generator import verify_url_secret
+from api.dependencies.auth_state import get_and_validate_auth_state
+import json
 GOOGLE_REDIRECT_URI=f"{os.getenv("REDIRECT_BASEURL")}/auth/google/callback"
 GOOGLE_CLIENT_ID=os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET=os.getenv("GOOGLE_CLIENT_SECRET")
@@ -26,18 +28,22 @@ router=APIRouter(
     tags=["Google Authentication"]
 )
 
-@router.get("/auth/google/login/{auth_token}")
-async def google_login(request:Request,auth_token:str):
-    verified_secret:dict=verify_url_secret(url_secret=auth_token,cur_ip=request.client.host) or {}
-    auth_id:str=verified_secret.get('auth_id')
-
-    if not await redis_get(auth_id):
-        ic("Invalid Auth Id")
-        raise SessionExpired(redirect_url=verified_secret.get("redirect_url",'/'))
+@router.get("/auth/google/login/{request_id}")
+async def google_login(request: Request, request_id: str):
+    state = await get_and_validate_auth_state(request, request_id, required_step="device_validation")
     
-    state=generate_unique_id("google") 
-    await redis_set(key=state,value=auth_token,exp=120)
-    ic(auth_id)
+    if "provider_selection" not in state.completed_steps:
+        state.completed_steps.append("provider_selection")
+    
+    state.current_step = "authentication"
+    if "authentication_started" not in state.completed_steps:
+        state.completed_steps.append("authentication_started")
+        
+    await redis_set(key=request_id, value=state.model_dump(), exp=300)
+    
+    oauth_state_data = {"request_id": request_id}
+    oauth_state_str = json.dumps(oauth_state_data)
+    ic(request_id)
 
     params = {
         "client_id": GOOGLE_CLIENT_ID,
@@ -46,7 +52,7 @@ async def google_login(request:Request,auth_token:str):
         "scope": "openid email profile",
         "access_type": "offline",
         "prompt": "consent",
-        'state': state,
+        'state': oauth_state_str,
     }
 
     google_auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
@@ -54,19 +60,14 @@ async def google_login(request:Request,auth_token:str):
 
 
 @router.get("/auth/google/callback")
-async def google_callback(request:Request,code: str,state: str):
-    ic(code,state)
-    auth_token=await redis_get(state) or ''
-    await redis_unlink(state)
-    verified_secret:dict=verify_url_secret(url_secret=auth_token,cur_ip=request.client.host) or {}
-    auth_id:str=verified_secret.get('auth_id')
-    
-    if not auth_id:
-        ic("Invalid State Parameter")
-        raise SessionExpired(
-            redirect_url=verified_secret.get("redirect_url",'/'),
-            message="Session Expired redirecting to DeB-Auth-Service"
-        )
+async def google_login_callback(request:Request,code: str, state: str):
+    try:
+        oauth_state_data = json.loads(state)
+        request_id = oauth_state_data.get("request_id")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+        
+    auth_state = await get_and_validate_auth_state(request, request_id, required_step="authentication_started")
     
     token_url = "https://oauth2.googleapis.com/token"
     data = {
@@ -88,15 +89,25 @@ async def google_callback(request:Request,code: str,state: str):
     ic(id_token)
     
     user_info:dict = jwt.decode(id_token, options={"verify_signature": False})
-    email = user_info.get("email")
-    name = user_info.get("name")
-    profile_picture = user_info.get("picture")
-
+    
+    auth_user = {
+        'email': user_info['email'],
+        'name': user_info.get('name'),
+        'profile_picture': user_info.get('picture'),
+        'custom_fields': auth_state.auth_data.get('custom_fields', {}),
+        'config': auth_state.config,
+        'apikey': auth_state.client_id,
+        'flow_type': auth_state.flow_type,
+        'auth_provider': 'google'
+    }
+    
+    auth_state.status = "completed"
+    await redis_set(key=request_id, value=auth_state.model_dump(), exp=300)
+    
     return await generate_redirect_code(
-        auth_id=auth_id,
-        auth_user={
-            'email':email,
-            'name':name,
-            'profile_picture':profile_picture
-        }
+        auth_id=request_id,
+        auth_user=auth_user,
+        isfor_otp=True,
+        request=request,
+        return_json=False
     )

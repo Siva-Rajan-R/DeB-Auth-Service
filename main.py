@@ -2,12 +2,14 @@ from fastapi import FastAPI,Request,routing
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from api.routers import deb_user_routes,auth_routes
-from api.routers.auth_providers_routes import otp_auth,google_auth,github_auth,facebook_auth
+from api.routers.auth_providers_routes import otp_auth,google_auth,github_auth,facebook_auth,password_auth,forgot_password
+from api.routers import admin_routes
 from operations.fb_operations.users_crud import create_debuggers_cred,ic
 from starlette.middleware.cors import CORSMiddleware
 from middlewares.invalid_route_middleware import InvalidRouteHandleMiddleware
 from exceptions import session_exp
 import sys,os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'core'))
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -50,6 +52,11 @@ app.include_router(otp_auth.router)
 app.include_router(google_auth.router)
 app.include_router(github_auth.router)
 app.include_router(facebook_auth.router)
+app.include_router(password_auth.router)
+app.include_router(forgot_password.router)
+
+# Admin Routes
+app.include_router(admin_routes.router)
 
 
 template=Jinja2Templates("templates")

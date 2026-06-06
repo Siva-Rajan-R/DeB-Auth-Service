@@ -1,13 +1,17 @@
 from fastapi.exceptions import HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 import secrets
+import time
 from hashlib import sha256
-from security.jwt_token import generate_jwt_token
+from core.security.jwt_token import generate_jwt_token
 from icecream import ic
 from operations.fb_operations.users_crud import get_user_by_email
+from operations.fb_operations.end_users_crud import get_end_user_by_email as get_sso_user, create_end_user as create_sso_user
 from operations.redis_operations.handlers import redis_set,redis_get,redis_unlink,redis_curttl
+from operations.redis_operations.session_manager import create_global_session, create_product_session, get_global_session
+from schemas.db_schemas.end_user_schema import EndUser
 
-async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False):
+async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False, request=None, return_json:bool=False):
     extracted_auth_dict=auth_user
     if not isfor_otp:
         extracted_auth_dict=await redis_get(auth_id)
@@ -25,12 +29,24 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         )
     
     auth_code=sha256(client_secret.encode()).hexdigest()[:10]+suffix_token
+    ic(auth_code)
 
-    app_token = generate_jwt_token({
+    jwt_payload = {
         "email": auth_user['email'],
-        "name": auth_user['name'],
-        'profile_picture': auth_user['profile_picture'],
-    },exp_min=60)
+        "name": auth_user.get('name') or auth_user.get('full_name'),
+        'profile_picture': auth_user.get('profile_picture'),
+        'custom_fields': auth_user.get('custom_fields', {}),
+        'auth_provider': auth_user.get('auth_provider', 'unknown')
+    }
+
+    if request:
+        jwt_payload['ip'] = request.client.host if request.client else "unknown"
+        jwt_payload['browser'] = request.headers.get("User-Agent", "unknown")
+
+    if auth_user.get('auth_provider') == 'password' and 'password' in auth_user:
+        jwt_payload['password'] = auth_user['password']
+
+    app_token = generate_jwt_token(jwt_payload, exp_min=60)
 
     authenticated_values={
         'token':app_token,
@@ -38,5 +54,50 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         'user_email':extracted_auth_dict['config']['user_email'],
         'apikey':extracted_auth_dict['apikey']
     }
-    await redis_set(key=auth_code,value=authenticated_values,exp=540)
-    return RedirectResponse(url=f"{extracted_auth_dict['config']['redirect_url']}?code={auth_code}", status_code=302)
+    await redis_set(key=auth_code,value=authenticated_values,exp=300)
+    
+    redirect_urls = extracted_auth_dict.get('config', {}).get('redirect_urls', {})
+    flow_type = extracted_auth_dict.get('flow_type', 'signin')
+    
+    if flow_type == 'signup':
+        base_url = redirect_urls.get('signup_success') or extracted_auth_dict.get('config', {}).get('redirect_url', '/')
+    else:
+        base_url = redirect_urls.get('signin_success') or extracted_auth_dict.get('config', {}).get('redirect_url', '/')
+        
+    redirect_url_final = f"{base_url}?token_id={auth_code}"
+    if return_json:
+        response = JSONResponse(content={"redirect_url": redirect_url_final})
+    else:
+        response = RedirectResponse(url=redirect_url_final, status_code=302)
+    
+    # SSO Logic
+    sso_config = extracted_auth_dict['config'].get('sso', {})
+    if sso_config.get('enabled', False) and request:
+        product_id = extracted_auth_dict['apikey']
+        user_email = auth_user['email']
+        
+        # Check if EndUser exists, if not create
+        sso_user = get_sso_user(product_id, user_email)
+        if not sso_user:
+            sso_user = EndUser(
+                id=secrets.token_hex(16),
+                email=user_email,
+                name=auth_user.get('name') or auth_user.get('full_name'),
+                profile_picture=auth_user.get('profile_picture'),
+                created_at=time.time(),
+                custom_fields=auth_user.get('custom_fields', {})
+            )
+            create_sso_user(product_id, sso_user)
+            
+        global_session_id = request.cookies.get("global_session_id")
+        ip = request.client.host if request.client else "unknown"
+        device = request.headers.get("User-Agent", "unknown")
+        
+        if not global_session_id or not await get_global_session(global_session_id):
+            session = await create_global_session(sso_user.id, ip, device)
+            global_session_id = session.session_id
+            response.set_cookie(key="global_session_id", value=global_session_id, httponly=True, samesite="lax", secure=True)
+            
+        await create_product_session(global_session_id, product_id, sso_user.id)
+
+    return response

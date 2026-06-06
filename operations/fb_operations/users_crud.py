@@ -68,7 +68,7 @@ def create_secrets(email:str,apikey:str,client_sceret:str,configurations:Configu
         db.child(APIKEYS_CHILD_NAME).child(apikey).set(configurations)
         db.child(USER_CHILD_NAME).child(email_key).set(user)
 
-        return "Api key added successfully"
+        return {'apikey': apikey, 'client_secret': client_sceret}
     
     except HTTPException:
         raise
@@ -332,9 +332,13 @@ def create_debuggers_cred(base_url:str):
             apikey=os.getenv("DEB_APIKEY"),
             client_sceret=os.getenv('DEB_CLIENT_SECRET'),
             configurations=Configuration(
-                auth_methods=[AuthMethods.otp,AuthMethods.google,AuthMethods.github],
+                auth_methods=[
+                    {"id": "otp", "name": "OTP", "enabled": True},
+                    {"id": "google", "name": "Google", "enabled": True},
+                    {"id": "github", "name": "GitHub", "enabled": True}
+                ],
                 branding="De-Buggers",
-                redirect_url=f"{base_url}/user/create"
+                redirect_urls={"signin_success": f"{base_url}/user/create"}
             )
         )
 
