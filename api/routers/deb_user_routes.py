@@ -55,16 +55,16 @@ async def user_auth(request:Request):
     return response
 
 @router.get("/user/create")
-async def create_users(request:Request,res:Response,code:Optional[str]=None):
-    ic(code)
+async def create_users(request:Request,res:Response,token_id:Optional[str]=None):
+    ic(token_id)
     FRONTEND_URL=os.getenv("FRONTEND_URL")
-    if not code:
+    if not token_id:
         raise SessionExpired(
             redirect_url=FRONTEND_URL,
             message="Authentication Falied redirecting to DeB-Auth-Service"
         )
     
-    token=await get_authenticated_user(inp=AuthenticatedUserSchema(code=code,client_secret=os.getenv("DEB_CLIENT_SECRET")),request=request)
+    token=await get_authenticated_user(inp=AuthenticatedUserSchema(token_id=token_id,client_id=os.getenv("DEB_APIKEY"),client_secret=os.getenv("DEB_CLIENT_SECRET")),request=request)
     ic(token)
     if not token.get('token',None):
         raise HTTPException(
