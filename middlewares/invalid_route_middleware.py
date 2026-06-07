@@ -18,7 +18,7 @@ class InvalidRouteHandleMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         try:
             print(self.routes)
-            rid=template.TemplateResponse("redirect.html",status_code=404,context={"request":request,"redirect_url":os.getenv("FRONTEND_URL"),'error_msg':"Page Not Found Redirecting to DeB-Auth-Service..."})
+            rid=template.TemplateResponse("redirect.html",status_code=404,name="redirect.html",context={"request":request,"redirect_url":os.getenv("FRONTEND_URL"),'error_msg':"Page Not Found Redirecting to DeB-Auth-Service..."})
             print("path params : ",request.path_params,"query params: ",request.query_params,'incoming path: ',request.url.path)
             # path=request.url.path.split('/')[0:-1]
             # print('/'.join(path))
