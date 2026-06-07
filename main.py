@@ -69,7 +69,7 @@ def root(request:Request):
 # adding custom exceptions
 app.add_exception_handler(session_exp.SessionExpired,session_exp.session_exp_handler)
 
-frontend_origins = ["https://authdebuggers.vercel.app","http://localhost:5173"]
+frontend_origins = ["https://authdebuggers.vercel.app","http://localhost:5173","https://dauth.debuggers.co.in"]
 
 
 # middlewares
