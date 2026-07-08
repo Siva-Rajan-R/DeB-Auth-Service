@@ -6,7 +6,8 @@ from hashlib import sha256
 from core.security.jwt_token import generate_jwt_token
 from icecream import ic
 from operations.fb_operations.users_crud import get_user_by_email
-from operations.fb_operations.end_users_crud import get_end_user_by_email as get_sso_user, create_end_user as create_sso_user
+from operations.fb_operations.end_users_crud import get_end_user_by_email as get_sso_user, create_end_user as create_sso_user, update_end_user
+
 from operations.redis_operations.handlers import redis_set,redis_get,redis_unlink,redis_curttl
 from operations.redis_operations.session_manager import create_global_session, create_product_session, get_global_session
 from schemas.db_schemas.end_user_schema import EndUser
@@ -89,6 +90,44 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
             )
             create_sso_user(product_id, sso_user)
             
+        # Determine best cookie domain for cross-subdomain SSO sharing
+        client_origin = request.headers.get("origin") or request.headers.get("referer") or ""
+        from urllib.parse import urlparse
+        parsed = urlparse(client_origin)
+        caller_host = parsed.netloc.lower()
+        if ":" in caller_host:
+            caller_host = caller_host.split(":")[0]
+
+        cookie_domain = None
+        registered_domains = sso_config.get('domains', [])
+        for domain in registered_domains:
+            d_str = (domain.get("domain") if isinstance(domain, dict) else str(domain)).strip().lower()
+            if not d_str:
+                continue
+            # Check matches
+            matched = False
+            if caller_host == d_str:
+                matched = True
+            elif d_str.startswith("*.") and caller_host.endswith(d_str[2:]):
+                matched = True
+                cookie_domain = f".{d_str[2:]}" # enable sharing across subdomains
+            elif d_str.startswith("*") and d_str.endswith("*") and d_str[1:-1] in caller_host:
+                matched = True
+            elif d_str.startswith("*") and caller_host.endswith(d_str[1:]):
+                matched = True
+            elif d_str.endswith("*") and caller_host.startswith(d_str[:-1]):
+                matched = True
+
+            if matched:
+                # Update accessed sites in user fields
+                if 'signed_in_sites' not in sso_user.custom_fields:
+                    sso_user.custom_fields['signed_in_sites'] = []
+                site_info = {"url": client_origin or caller_host, "timestamp": time.time()}
+                if site_info["url"] not in [s.get("url") for s in sso_user.custom_fields['signed_in_sites'] if isinstance(s, dict)]:
+                    sso_user.custom_fields['signed_in_sites'].append(site_info)
+                update_end_user(product_id, sso_user)
+                break
+
         global_session_id = request.cookies.get("global_session_id")
         ip = request.client.host if request.client else "unknown"
         device = request.headers.get("User-Agent", "unknown")
@@ -96,8 +135,16 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         if not global_session_id or not await get_global_session(global_session_id):
             session = await create_global_session(sso_user.id, ip, device)
             global_session_id = session.session_id
-            response.set_cookie(key="global_session_id", value=global_session_id, httponly=True, samesite="lax", secure=True)
+            response.set_cookie(
+                key="global_session_id", 
+                value=global_session_id, 
+                httponly=True, 
+                samesite="lax", 
+                secure=True,
+                domain=cookie_domain
+            )
             
         await create_product_session(global_session_id, product_id, sso_user.id)
+
 
     return response

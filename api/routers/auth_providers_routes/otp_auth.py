@@ -42,6 +42,19 @@ async def otp_page(inp: OtpSendSchema, request:Request, bgt:BackgroundTasks):
         state.completed_steps.append("provider_selection")
         
     email = inp.email
+
+    # ── Email lock enforcement ────────────────────────────────────────────────
+    # If this auth session was initiated with a locked/prefilled email, reject
+    # any attempt (e.g. from Postman) to use a different email address.
+    if state.locked_email and email.lower() != state.locked_email:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "Email address does not match the locked email for this session.",
+                "code": "EMAIL_LOCKED"
+            }
+        )
+
     fullname = inp.fullname
 
     otp=generate_otp()

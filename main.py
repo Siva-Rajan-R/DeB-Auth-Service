@@ -2,7 +2,8 @@ from fastapi import FastAPI,Request,routing
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from api.routers import deb_user_routes,auth_routes
-from api.routers.auth_providers_routes import otp_auth,google_auth,github_auth,facebook_auth,password_auth,forgot_password
+from api.routers.auth_providers_routes import otp_auth,google_auth,github_auth,facebook_auth,password_auth,forgot_password,two_factor_auth
+
 from api.routers import admin_routes
 from operations.fb_operations.users_crud import create_debuggers_cred,ic
 from starlette.middleware.cors import CORSMiddleware
@@ -54,6 +55,8 @@ app.include_router(github_auth.router)
 app.include_router(facebook_auth.router)
 app.include_router(password_auth.router)
 app.include_router(forgot_password.router)
+app.include_router(two_factor_auth.router)
+
 
 # Admin Routes
 app.include_router(admin_routes.router)
@@ -82,4 +85,4 @@ app.add_middleware(
 )
 
 
-app.add_middleware(InvalidRouteHandleMiddleware,routes=[paths.path for paths in app.routes])
+app.add_middleware(InvalidRouteHandleMiddleware, routes=[r.path for r in app.routes if hasattr(r, 'path')])

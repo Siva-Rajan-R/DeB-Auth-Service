@@ -19,3 +19,6 @@ class AuthState(BaseModel):
     completed_steps: List[str] = ["request_validation"]
     last_activity: float
     auth_data: Dict[str, Any] = {}
+    # If set, only this email is allowed for all subsequent auth steps in this session.
+    # Set via ?prefill_email=... during flow init and enforced server-side.
+    locked_email: Optional[str] = None

@@ -138,9 +138,33 @@ def update_apikey_configurations(inp:UpdateConfigSchema,user_email:str=Depends(v
 
     return update_cofigurations(email=user_email,apikey=inp.apikey,new_configurations=inp.config)
 
+from fastapi import UploadFile, File
+from services.minio_storage import upload_logo_to_minio
+import time
+
+@router.post('/user/secrets/upload-logo')
+async def upload_logo(
+    file: UploadFile = File(...),
+    user_email: str = Depends(verify_user)
+):
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image file uploads are supported.")
+    try:
+        file_bytes = await file.read()
+        file_extension = file.filename.split(".")[-1] if "." in file.filename else "png"
+        unique_filename = f"logo_{int(time.time())}.{file_extension}"
+        public_url = upload_logo_to_minio(
+            file_data=file_bytes,
+            file_name=unique_filename,
+            content_type=file.content_type
+        )
+        return {"success": True, "logo_url": public_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/user/secrets")
 def get_user_by_pk(request:Request,user_email:str=Depends(verify_user)):
+
     ic(user_email,request.cookies,request.cookies.get("token"))
     user=get_user_secrets(user_email=user_email)
     return user

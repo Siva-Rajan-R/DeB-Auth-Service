@@ -9,8 +9,9 @@ from exceptions.session_exp import SessionExpired
 from icecream import ic 
 from utils.url_secret_generator import generate_url_secret,verify_url_secret
 from operations.redis_operations.session_manager import get_global_session, extend_global_session
-from operations.fb_operations.end_users_crud import get_all_end_users
+from operations.fb_operations.end_users_crud import get_all_end_users, update_end_user
 from utils.redirectcode_genereator import generate_redirect_code
+
 from schemas.auth_state_schema import AuthState, DeviceFingerprint
 from api.dependencies.auth_state import get_and_validate_auth_state
 import time
@@ -108,7 +109,8 @@ async def login_page(auth_id:str,request:Request):
     )
 
 class InitAuthRequest(BaseModel):
-    flow_type: str # 'signin' or 'signup'
+    flow_type: str                        # 'signin' or 'signup'
+    prefill_email: str = ""              # Optional: lock this email for the whole session
 
 @router.post("/api/auth/request/{request_id}/init")
 async def init_auth_flow(
@@ -132,29 +134,94 @@ async def init_auth_flow(
         user_agent=request.headers.get("user-agent")
     )
     
+    # Store locked email in state if provided
+    if inp.prefill_email:
+        state.locked_email = inp.prefill_email.strip().lower()
+
     await redis_set(key=request_id, value=state.model_dump(), exp=300)
 
     # SSO Logic: Check for active global session
     sso_config = state.config.get('sso', {})
     if sso_config.get('enabled', False):
-        global_session_id = request.cookies.get("global_session_id")
-        if global_session_id:
-            session = await get_global_session(global_session_id)
-            if session:
-                product_id = state.client_id
-                users = get_all_end_users(product_id)
-                user = next((u for u in users if u.id == session.user_id), None)
-                if user:
-                    await extend_global_session(global_session_id)
-                    auth_user = {
-                        'email': user.email,
-                        'name': user.name,
-                        'profile_picture': user.profile_picture,
-                        'custom_fields': user.custom_fields,
-                        'config': state.config,
-                        'apikey': state.client_id
-                    }
-                    return await generate_redirect_code(auth_user, request_id, isfor_otp=True, request=request, return_json=True)
+        # 1. Domain Validation: match caller's Origin or Referer against registered SSO domains
+        client_origin = request.headers.get("origin") or request.headers.get("referer") or ""
+        # Extract host name
+        from urllib.parse import urlparse
+        parsed = urlparse(client_origin)
+        caller_host = parsed.netloc.lower() or parsed.path.lower()
+        if ":" in caller_host:
+            caller_host = caller_host.split(":")[0]
+
+        # Verify host matches any registered domains with wildcards (*.domain.com, *domain*, etc.)
+        matched_domain = False
+        registered_domains = sso_config.get('domains', [])
+        for domain in registered_domains:
+            # normalize domain from db object or string
+            d_str = (domain.get("domain") if isinstance(domain, dict) else str(domain)).strip().lower()
+            if not d_str:
+                continue
+            
+            # Match rules:
+            # a) Exact match
+            if caller_host == d_str:
+                matched_domain = True
+                break
+            # b) *.domain.com wildcard
+            if d_str.startswith("*."):
+                suffix = d_str[2:]
+                if caller_host.endswith(suffix):
+                    matched_domain = True
+                    break
+            # c) *domain* format
+            if d_str.startswith("*") and d_str.endswith("*"):
+                pattern = d_str[1:-1]
+                if pattern in caller_host:
+                    matched_domain = True
+                    break
+            # d) *domain format
+            elif d_str.startswith("*"):
+                pattern = d_str[1:]
+                if caller_host.endswith(pattern):
+                    matched_domain = True
+                    break
+            # e) domain* format
+            elif d_str.endswith("*"):
+                pattern = d_str[:-1]
+                if caller_host.startswith(pattern):
+                    matched_domain = True
+                    break
+
+        if matched_domain:
+            global_session_id = request.cookies.get("global_session_id")
+            if global_session_id:
+                session = await get_global_session(global_session_id)
+                if session:
+                    # 2. Browser Signature Match validation (Security confirmation)
+                    cur_browser = request.headers.get("User-Agent", "unknown")
+                    if session.device_info == cur_browser:
+                        product_id = state.client_id
+                        users = get_all_end_users(product_id)
+                        user = next((u for u in users if u.email == session.user_id or u.id == session.user_id), None)
+                        if user:
+                            await extend_global_session(global_session_id)
+                            # Record this login site in user's custom fields/history
+                            if 'signed_in_sites' not in user.custom_fields:
+                                user.custom_fields['signed_in_sites'] = []
+                            site_info = {"url": client_origin or caller_host, "timestamp": time.time()}
+                            if site_info["url"] not in [s.get("url") for s in user.custom_fields['signed_in_sites'] if isinstance(s, dict)]:
+                                user.custom_fields['signed_in_sites'].append(site_info)
+                            update_end_user(product_id, user)
+
+                            auth_user = {
+                                'email': user.email,
+                                'name': user.name,
+                                'profile_picture': user.profile_picture,
+                                'custom_fields': user.custom_fields,
+                                'config': state.config,
+                                'apikey': state.client_id
+                            }
+                            return await generate_redirect_code(auth_user, request_id, isfor_otp=True, request=request, return_json=True)
+
     
     redirect_urls = state.config.get('redirect_urls', {})
     redirect_url = redirect_urls.get('signin_success', '/')

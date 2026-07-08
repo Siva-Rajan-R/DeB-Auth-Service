@@ -22,8 +22,21 @@ async def password_login(inp: PasswordAuthSchema, request: Request):
     
     if "provider_selection" not in state.completed_steps:
         state.completed_steps.append("provider_selection")
-        
+
+    # ── Email lock enforcement ────────────────────────────────────────────────
+    # If this auth session was initiated with a locked/prefilled email, reject
+    # any attempt (e.g. from Postman) to use a different email address.
+    if state.locked_email and inp.email.lower() != state.locked_email:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "Email address does not match the locked email for this session.",
+                "code": "EMAIL_LOCKED"
+            }
+        )
+
     state.current_step = "authentication"
+
     if "authentication_started" not in state.completed_steps:
         state.completed_steps.append("authentication_started")
 
