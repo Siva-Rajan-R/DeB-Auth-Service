@@ -126,8 +126,25 @@ def remove_user_apikey(apikey:str,user_email:str=Depends(verify_user)):
         apikey=apikey
     )
 
+async def revoke_active_sessions_for_apikey(apikey: str):
+    try:
+        from configs.redis_config import redis
+        import json
+        async for key in redis.scan_iter("*"):
+            data = await redis.get(key)
+            if data:
+                try:
+                    val = json.loads(data)
+                    if isinstance(val, dict) and val.get("client_id") == apikey:
+                        val["status"] = "revoked"
+                        await redis.set(name=key, value=json.dumps(val), ex=300)
+                except Exception:
+                    pass
+    except Exception as e:
+        ic(f"Error revoking active sessions: {e}")
+
 @router.put('/user/secrets/config')
-def update_apikey_configurations(inp:UpdateConfigSchema,user_email:str=Depends(verify_user)):
+async def update_apikey_configurations(inp:UpdateConfigSchema,user_email:str=Depends(verify_user)):
 
     enabled_methods = [m for m in inp.config.get("auth_methods", []) if m.get("enabled")]
     if len(enabled_methods)<=0:
@@ -136,7 +153,9 @@ def update_apikey_configurations(inp:UpdateConfigSchema,user_email:str=Depends(v
             detail="Choose atleast one auth method"
         )
 
-    return update_cofigurations(email=user_email,apikey=inp.apikey,new_configurations=inp.config)
+    res = update_cofigurations(email=user_email,apikey=inp.apikey,new_configurations=inp.config)
+    await revoke_active_sessions_for_apikey(inp.apikey)
+    return res
 
 from fastapi import UploadFile, File
 from services.minio_storage import upload_logo_to_minio

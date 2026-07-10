@@ -40,6 +40,14 @@ def validate_client_credentials(client_id: str, client_secret: str):
     config = check_apikey_exists(client_id)
     if not config:
         raise HTTPException(status_code=403, detail="Invalid Client ID")
+    
+    # Ensure Two-Factor Authentication is enabled for the project
+    two_factor_config = config.get("two_factor", {})
+    if not two_factor_config.get("enabled", False):
+        raise HTTPException(
+            status_code=403,
+            detail="Two-Factor Authentication (2FA) is disabled for this project"
+        )
     # Retrieve project owner user to check the secret
     from operations.fb_operations.users_crud import get_all_users
     users = get_all_users()

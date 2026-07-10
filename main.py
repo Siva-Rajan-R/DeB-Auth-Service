@@ -78,11 +78,11 @@ frontend_origins = ["https://authdebuggers.vercel.app","http://localhost:5173","
 # middlewares
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=frontend_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-app.add_middleware(InvalidRouteHandleMiddleware, routes=[r.path for r in app.routes if hasattr(r, 'path')])
+app.add_middleware(InvalidRouteHandleMiddleware, routes=[r.path for r in app.routes if hasattr(r, 'path')])

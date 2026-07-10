@@ -13,9 +13,11 @@ from operations.redis_operations.session_manager import create_global_session, c
 from schemas.db_schemas.end_user_schema import EndUser
 
 async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False, request=None, return_json:bool=False):
+    session_data = await redis_get(auth_id) or {}
+    
     extracted_auth_dict=auth_user
     if not isfor_otp:
-        extracted_auth_dict=await redis_get(auth_id)
+        extracted_auth_dict=session_data
 
     await redis_unlink(auth_id)
     ic(extracted_auth_dict)
@@ -32,12 +34,20 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
     auth_code=sha256(client_secret.encode()).hexdigest()[:10]+suffix_token
     ic(auth_code)
 
+    locked_email = session_data.get('locked_email')
+    locked_phone = session_data.get('locked_phone')
+    lock_method = session_data.get('lock_method')
+    prefilled = bool(locked_email or locked_phone)
+
     jwt_payload = {
-        "email": auth_user['email'],
+        "email": auth_user.get('email') or None,
+        "mobile_number": auth_user.get('mobile_number'),
         "name": auth_user.get('name') or auth_user.get('full_name'),
         'profile_picture': auth_user.get('profile_picture'),
         'custom_fields': auth_user.get('custom_fields', {}),
-        'auth_provider': auth_user.get('auth_provider', 'unknown')
+        'auth_provider': auth_user.get('auth_provider', 'unknown'),
+        'prefilled': prefilled,
+        'lock_method': lock_method or None
     }
 
     if request:
@@ -83,6 +93,7 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
             sso_user = EndUser(
                 id=secrets.token_hex(16),
                 email=user_email,
+                mobile_number=auth_user.get('mobile_number'),
                 name=auth_user.get('name') or auth_user.get('full_name'),
                 profile_picture=auth_user.get('profile_picture'),
                 created_at=time.time(),

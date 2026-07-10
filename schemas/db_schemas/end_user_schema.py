@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 class EndUser(BaseModel):
     id: str
     email: EmailStr
+    mobile_number: Optional[str] = None
     name: Optional[str] = None
     profile_picture: Optional[str] = None
     roles: List[str] = []

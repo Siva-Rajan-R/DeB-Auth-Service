@@ -2,12 +2,14 @@ from fastapi import APIRouter,HTTPException,Request,BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel,EmailStr
+from typing import Optional
 from operations.fb_operations.users_crud import check_apikey_exists,get_user_by_email
 from core.security.unique_id import generate_unique_id
 from core.security.otp import generate_otp
 from exceptions.session_exp import SessionExpired
 from icecream import ic
 from services.email_service import main,otp_email
+from services.message_central import MessageCentral
 import secrets
 from hashlib import sha256
 from dotenv import load_dotenv
@@ -25,7 +27,8 @@ router=APIRouter(
 
 class OtpSendSchema(BaseModel):
     request_id: str
-    email: EmailStr
+    email: Optional[EmailStr] = None
+    mobile_number: Optional[str] = None
     fullname: str = ""
     custom_fields: dict = {}
 
@@ -41,37 +44,78 @@ async def otp_page(inp: OtpSendSchema, request:Request, bgt:BackgroundTasks):
     if "provider_selection" not in state.completed_steps:
         state.completed_steps.append("provider_selection")
         
-    email = inp.email
-
-    # ── Email lock enforcement ────────────────────────────────────────────────
-    # If this auth session was initiated with a locked/prefilled email, reject
-    # any attempt (e.g. from Postman) to use a different email address.
-    if state.locked_email and email.lower() != state.locked_email:
+    if not inp.email and not inp.mobile_number:
         raise HTTPException(
-            status_code=403,
-            detail={
-                "message": "Email address does not match the locked email for this session.",
-                "code": "EMAIL_LOCKED"
-            }
+            status_code=422,
+            detail="Either email or mobile number must be provided."
         )
 
     fullname = inp.fullname
-
-    otp=generate_otp()
-    ic(otp)
-    email_content=otp_email.generate_otp_email_content(otp=otp)
-    bgt.add_task(main.send_email,recivers_email=[email],subject="Otp From DeB-Authentication Service",body=email_content,is_html=True)
-    
     custom_fields = inp.custom_fields
-    
-    state.auth_data = {
-        'email': email,
-        'full_name': fullname,
-        'otp': otp,
-        'verify_count': 0,
-        'custom_fields': custom_fields,
-        'auth_provider': 'otp'
-    }
+
+    if inp.mobile_number:
+        mobile_number = inp.mobile_number.strip()
+        
+        # ── Phone lock enforcement ────────────────────────────────────────────────
+        if getattr(state, 'locked_phone', None) and mobile_number != state.locked_phone:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "message": "Phone number does not match the locked phone number for this session.",
+                    "code": "PHONE_LOCKED"
+                }
+            )
+            
+        mc = MessageCentral()
+        try:
+            res = await mc.send_otp(phone=mobile_number)
+            verification_id = res.get("data", {}).get("verificationId")
+            if not verification_id:
+                raise Exception("Did not receive verificationId from Message Central.")
+        except Exception as e:
+            ic(f"Error sending mobile OTP: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to send OTP to mobile number."
+            )
+            
+        # Use a dummy email for systems expecting email uniqueness / presence
+        email = inp.email or ""
+        
+        state.auth_data = {
+            'email': email,
+            'mobile_number': mobile_number,
+            'verification_id': verification_id,
+            'full_name': fullname,
+            'verify_count': 0,
+            'custom_fields': custom_fields,
+            'auth_provider': 'otp-phone'
+        }
+    else:
+        email = inp.email
+        # ── Email lock enforcement ────────────────────────────────────────────────
+        if state.locked_email and email.lower() != state.locked_email:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "message": "Email address does not match the locked email for this session.",
+                    "code": "EMAIL_LOCKED"
+                }
+            )
+
+        otp=generate_otp()
+        ic(otp)
+        email_content=otp_email.generate_otp_email_content(otp=otp)
+        bgt.add_task(main.send_email,recivers_email=[email],subject="Otp From DeB-Authentication Service",body=email_content,is_html=True)
+        
+        state.auth_data = {
+            'email': email,
+            'full_name': fullname,
+            'otp': otp,
+            'verify_count': 0,
+            'custom_fields': custom_fields,
+            'auth_provider': 'otp-email'
+        }
     
     state.current_step = "authentication"
     if "authentication_started" not in state.completed_steps:
@@ -102,11 +146,29 @@ async def verify_otp(inp: OtpVerifySchema, request:Request):
         else:
             raise HTTPException(status_code=403, detail="max verify attempts reached")
     
-    if auth_data.get('otp') != otp:
-        auth_data['verify_count'] = auth_data.get('verify_count', 0) + 1
-        state.auth_data = auth_data
-        await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)
-        raise HTTPException(status_code=422, detail="invalid otp")
+    verification_id = auth_data.get('verification_id')
+    if verification_id:
+        # Message Central OTP Verification
+        mc = MessageCentral()
+        try:
+            res = await mc.verify_otp(verification_id=verification_id, otp=otp)
+            status_code = res.get("responseCode")
+            # Usually 200 is success. Let's check responseCode.
+            if status_code != 200:
+                raise Exception(f"Message Central validation failed: {res}")
+        except Exception as e:
+            ic(f"Mobile OTP verification failed: {e}")
+            auth_data['verify_count'] = auth_data.get('verify_count', 0) + 1
+            state.auth_data = auth_data
+            await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)
+            raise HTTPException(status_code=422, detail="invalid otp")
+    else:
+        # Local email OTP verification
+        if auth_data.get('otp') != otp:
+            auth_data['verify_count'] = auth_data.get('verify_count', 0) + 1
+            state.auth_data = auth_data
+            await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)
+            raise HTTPException(status_code=422, detail="invalid otp")
 
     # OTP Verified Successfully
     if "otp_verification" not in state.completed_steps:
@@ -123,6 +185,7 @@ async def verify_otp(inp: OtpVerifySchema, request:Request):
 
     auth_user = {
         'email': auth_data['email'],
+        'mobile_number': auth_data.get('mobile_number'),
         'name': auth_data['full_name'],
         'profile_picture': None,
         'custom_fields': auth_data.get('custom_fields', {}),

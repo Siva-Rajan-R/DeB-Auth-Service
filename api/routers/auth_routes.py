@@ -111,6 +111,8 @@ async def login_page(auth_id:str,request:Request):
 class InitAuthRequest(BaseModel):
     flow_type: str                        # 'signin' or 'signup'
     prefill_email: str = ""              # Optional: lock this email for the whole session
+    prefill_phone: str = ""              # Optional: lock this phone for the whole session
+    lock_method: str = ""                # Optional: lock method used
 
 @router.post("/api/auth/request/{request_id}/init")
 async def init_auth_flow(
@@ -134,9 +136,20 @@ async def init_auth_flow(
         user_agent=request.headers.get("user-agent")
     )
     
-    # Store locked email in state if provided
-    if inp.prefill_email:
+    raw_methods = state.config.get('auth_methods', [])
+    email_otp_enabled = any((m['id'] == 'email_otp' or m['id'] == 'otp') and m.get('enabled') for m in raw_methods)
+    mobile_otp_enabled = any(m['id'] == 'mobile_otp' and m.get('enabled') for m in raw_methods)
+
+    # Store locked email in state if provided and email OTP is enabled
+    if inp.prefill_email and email_otp_enabled:
         state.locked_email = inp.prefill_email.strip().lower()
+    # Store locked phone in state if provided and mobile OTP is enabled
+    if inp.prefill_phone and mobile_otp_enabled:
+        state.locked_phone = inp.prefill_phone.strip()
+    
+    # Store lock method if provided
+    if inp.lock_method:
+        state.lock_method = inp.lock_method.strip()
 
     await redis_set(key=request_id, value=state.model_dump(), exp=300)
 

@@ -12,6 +12,7 @@ class Configuration(TypedDict, total=False):
     signup_fields: Optional[List[dict]]
     sso: Optional[dict]
     ui: Optional[dict]
+    two_factor: Optional[dict]
 
 
 class User(TypedDict):

@@ -22,6 +22,14 @@ async def get_and_validate_auth_state(
     failure_url = state.config.get('redirect_urls', {}).get('signin_failure', '/')
 
     # 1. Validate Status
+    if state.status == "revoked":
+        raise HTTPException(
+            status_code=403, 
+            detail={
+                "message": "Something went wrong, please try again.", 
+                "redirect_url": failure_url
+            }
+        )
     if state.status == "completed":
         raise HTTPException(status_code=403, detail={"message": "Authentication flow already completed", "redirect_url": failure_url})
     if state.status in ["failed", "cancelled", "expired"]:

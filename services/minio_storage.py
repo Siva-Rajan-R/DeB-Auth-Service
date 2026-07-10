@@ -4,11 +4,11 @@ from minio.error import S3Error
 from icecream import ic
 
 # Load configs
-endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
-secure = os.getenv("MINIO_SECURE", "False").lower() == "true"
-bucket_name = os.getenv("MINIO_BUCKET_NAME", "dauth-logos")
+endpoint = os.getenv("MINIO_ENDPOINT", "")
+access_key = os.getenv("MINIO_ACCESS_KEY", "")
+secret_key = os.getenv("MINIO_SECRET_KEY", "")
+secure = os.getenv("MINIO_SECURE", "").lower() == "true"
+bucket_name = os.getenv("MINIO_BUCKET_NAME", "")
 
 # Initialize Client
 try:

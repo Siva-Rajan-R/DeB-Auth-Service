@@ -22,3 +22,5 @@ class AuthState(BaseModel):
     # If set, only this email is allowed for all subsequent auth steps in this session.
     # Set via ?prefill_email=... during flow init and enforced server-side.
     locked_email: Optional[str] = None
+    locked_phone: Optional[str] = None
+    lock_method: Optional[str] = None
