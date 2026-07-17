@@ -35,6 +35,7 @@ def upload_logo_to_minio(file_data, file_name: str, content_type: str) -> str:
         if not minio_client.bucket_exists(bucket_name):
             minio_client.make_bucket(bucket_name)
             ic(f"Created MinIO Bucket: {bucket_name}")
+
             
             # Set public read-only policy so uploaded logos can be loaded by frontend
             policy = f'''{{

@@ -91,7 +91,7 @@ async def create_users(request:Request,res:Response,token_id:Optional[str]=None)
     refresh_token=generate_jwt_token(data={'data':encrypted_data},exp_days=5,alg=DEB_USER_REFRESH_JWT_ALGORITHM,key=DEB_USER_REFRESH_KEY)
     ic(token)
     
-    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}&access_token={access_token}&refresh_token={refresh_token}',status_code=302)
+    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user["profile_picture"]}&name={auth_user["name"]}&access_token={access_token}&refresh_token={refresh_token}',status_code=302)
     # response.set_cookie(key="token",value=token,httponly=True,samesite='none',secure=True)
     ic(response.headers,response.__dict__)
     # return {"redirect_url":f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}'}
