@@ -1,0 +1,21 @@
+services:
+  dauth-service:
+    image: sivarajan001/dauth-service:latest
+    container_name: dauth-service
+
+    restart: unless-stopped
+
+    ports:
+      - "8100:8000"
+
+    env_file:
+      - ./dauth_service/.env
+
+    volumes:
+      - ./dauth_service/logs:/app/logs
+
+    command: >
+      gunicorn main:app
+      -k uvicorn.workers.UvicornWorker
+      --bind 0.0.0.0:8000
+      --workers 1
