@@ -1,4 +1,5 @@
 from fastapi import APIRouter,Request,HTTPException
+from typing import Optional, Dict, Any
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from operations.fb_operations.users_crud import check_apikey_exists,get_user_by_email
@@ -27,6 +28,7 @@ template=Jinja2Templates("templates")
 
 class AuthSchema(BaseModel):
     apikey:str
+    additional_infos: Optional[Dict[str, Any]] = None
 
 @router.post("/auth")
 async def authenticate(inp:AuthSchema,request:Request):    
@@ -37,7 +39,8 @@ async def authenticate(inp:AuthSchema,request:Request):
         request_id=auth_id,
         client_id=inp.apikey,
         config=configurations,
-        last_activity=time.time()
+        last_activity=time.time(),
+        additional_infos=inp.additional_infos
     )
 
     await redis_set(key=auth_id,value=state.model_dump(),exp=300) # 5 minutes

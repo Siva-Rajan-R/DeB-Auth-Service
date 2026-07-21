@@ -47,7 +47,8 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         'custom_fields': auth_user.get('custom_fields', {}),
         'auth_provider': auth_user.get('auth_provider', 'unknown'),
         'prefilled': prefilled,
-        'lock_method': lock_method or None
+        'lock_method': lock_method or None,
+        'additional_infos': session_data.get('additional_infos')
     }
 
     if request:
