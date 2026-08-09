@@ -18,4 +18,9 @@ async def session_exp_handler(request:Request,error:SessionExpired):
     #     status_code=401,
     # )
 
-    return template.TemplateResponse("redirect.html",status_code=401,name="Session expired",context={"request":request,"redirect_url":error.redirect_url,'error_msg':error.message})
+    return template.TemplateResponse(
+        request=request,
+        name="redirect.html",
+        context={"redirect_url": error.redirect_url, "error_msg": error.message},
+        status_code=401
+    )

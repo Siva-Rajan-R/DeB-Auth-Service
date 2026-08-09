@@ -26,8 +26,13 @@ GITHUB_REDIRECT_URI=f"{os.getenv("REDIRECT_BASEURL")}/auth/github/callback"
 router=APIRouter(
     tags=["GitHub Authentication"]
 )
-@router.get('/auth/github/login/{request_id}')
-async def github_login(request: Request, request_id: str):
+@router.get('/auth/github/login/{auth_token}')
+async def github_login(request: Request, auth_token: str):
+    verified_secret: dict = verify_url_secret(url_secret=auth_token, request=request) or {}
+    request_id: str = verified_secret.get('auth_id')
+    if not request_id or not await redis_get(request_id):
+        raise SessionExpired(redirect_url=verified_secret.get("redirect_url", '/'))
+
     state = await get_and_validate_auth_state(request, request_id, required_step="device_validation")
     
     if "provider_selection" not in state.completed_steps:
@@ -79,29 +84,37 @@ async def github_callback(request: Request, code: str, state: str):
         if not access_token:
             raise HTTPException(400, "Failed to get access token from GitHub")
 
-        user_resp = await http.get(
-            "https://api.github.com/user",
-            headers={"Authorization": f"token {access_token}"}
-        )
+        user_headers = {
+            "Authorization": f"token {access_token}",
+            "User-Agent": "DAuth-App",
+            "Accept": "application/json"
+        }
 
-        user_info:dict = user_resp.json()
+        user_resp = await http.get("https://api.github.com/user", headers=user_headers)
+        user_info: dict = user_resp.json() if user_resp.status_code == 200 else {}
 
-        email_resp = await http.get(
-            "https://github.com/user/emails",
-            headers={"Authorization": f"token {access_token}"}
-        )
-
-        emails = email_resp.json()
+        email_resp = await http.get("https://api.github.com/user/emails", headers=user_headers)
+        emails = email_resp.json() if email_resp.status_code == 200 else []
 
     primary_email = None
     if isinstance(emails, list):
         for e in emails:
             if e.get("primary") and e.get("verified"):
                 primary_email = e.get("email")
+                break
+        if not primary_email and len(emails) > 0:
+            primary_email = emails[0].get("email")
     
+    email_val = primary_email or user_info.get("email") or ""
+    raw_name = user_info.get('name') or user_info.get('login')
+    if not raw_name or str(raw_name).strip() in ['', 'None', 'null', 'undefined']:
+        user_name = email_val.split('@')[0] if email_val and '@' in email_val else 'GitHub User'
+    else:
+        user_name = str(raw_name).strip()
+
     auth_user = {
-        'email': primary_email or user_info.get("email"),
-        'name': user_info.get('name') or user_info.get('login'),
+        'email': email_val,
+        'name': user_name,
         'profile_picture': user_info.get('avatar_url'),
         'custom_fields': auth_state.auth_data.get('custom_fields', {}),
         'config': auth_state.config,

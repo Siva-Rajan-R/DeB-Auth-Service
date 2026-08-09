@@ -335,7 +335,8 @@ def create_debuggers_cred(base_url:str):
                 auth_methods=[
                     {"id": "otp", "name": "OTP", "enabled": True},
                     {"id": "google", "name": "Google", "enabled": True},
-                    {"id": "github", "name": "GitHub", "enabled": True}
+                    {"id": "github", "name": "GitHub", "enabled": True},
+                    {"id": "facebook", "name": "Facebook", "enabled": True}
                 ],
                 branding="De-Buggers",
                 redirect_urls={"signin_success": f"{base_url}/user/create"}

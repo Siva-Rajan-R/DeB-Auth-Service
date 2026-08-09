@@ -5,23 +5,24 @@ from icecream import ic
 
 END_USERS_CHILD = "DeB-EndUsers"
 
-def email_key_generator(email:str):
-    return email.replace('.','_').replace('@','_at_')
+def identifier_key_generator(identifier: str):
+    return identifier.replace('.', '_').replace('@', '_at_').replace('+', '_plus_')
 
 def create_end_user(product_id: str, user: EndUser):
     try:
-        email_key = email_key_generator(user.email)
+        user_id = user.email or user.mobile_number or user.id
+        key = identifier_key_generator(user_id)
         user_dict = user.dict()
-        db.child(END_USERS_CHILD).child(product_id).child(email_key).set(user_dict)
+        db.child(END_USERS_CHILD).child(product_id).child(key).set(user_dict)
         return user
     except Exception as e:
         ic(f"Error creating end user: {e}")
         raise HTTPException(status_code=500, detail="Failed to create end user")
 
-def get_end_user_by_email(product_id: str, email: str):
+def get_end_user_by_identifier(product_id: str, identifier: str):
     try:
-        email_key = email_key_generator(email)
-        user_data = db.child(END_USERS_CHILD).child(product_id).child(email_key).get().val()
+        key = identifier_key_generator(identifier)
+        user_data = db.child(END_USERS_CHILD).child(product_id).child(key).get().val()
         if user_data:
             return EndUser(**user_data)
         return None
@@ -29,10 +30,14 @@ def get_end_user_by_email(product_id: str, email: str):
         ic(f"Error getting end user: {e}")
         raise HTTPException(status_code=500, detail="Failed to get end user")
 
+def get_end_user_by_email(product_id: str, email: str):
+    return get_end_user_by_identifier(product_id, email)
+
 def update_end_user(product_id: str, user: EndUser):
     try:
-        email_key = email_key_generator(user.email)
-        db.child(END_USERS_CHILD).child(product_id).child(email_key).update(user.dict())
+        user_id = user.email or user.mobile_number or user.id
+        key = identifier_key_generator(user_id)
+        db.child(END_USERS_CHILD).child(product_id).child(key).update(user.dict())
         return user
     except Exception as e:
         ic(f"Error updating end user: {e}")

@@ -57,19 +57,19 @@ async def get_and_validate_auth_state(
 
     if state.device_fingerprint:
         stored = state.device_fingerprint
-        if stored.ip != current_fingerprint.ip:
+        is_loopback = (stored.ip in ["127.0.0.1", "::1", "localhost"]) and (current_fingerprint.ip in ["127.0.0.1", "::1", "localhost"])
+        if stored.ip and current_fingerprint.ip and stored.ip != current_fingerprint.ip and not is_loopback:
             state.status = "failed"
             await redis_set(key=request_id, value=state.model_dump(), exp=60)
             raise HTTPException(status_code=403, detail={"message": "FINGERPRINT_MISMATCH: IP Address changed", "redirect_url": failure_url})
         
-        # We can also strictly check browser/os if we want, but user agents can sometimes slightly shift.
-        # Strict exact match as requested:
-        if stored.browser and stored.browser != current_fingerprint.browser:
+        # Only validate browser and OS if header is explicitly provided in the request
+        if stored.browser and current_fingerprint.browser and stored.browser != current_fingerprint.browser:
             state.status = "failed"
             await redis_set(key=request_id, value=state.model_dump(), exp=60)
             raise HTTPException(status_code=403, detail={"message": "FINGERPRINT_MISMATCH: Browser changed", "redirect_url": failure_url})
             
-        if stored.os and stored.os != current_fingerprint.os:
+        if stored.os and current_fingerprint.os and stored.os != current_fingerprint.os:
             state.status = "failed"
             await redis_set(key=request_id, value=state.model_dump(), exp=60)
             raise HTTPException(status_code=403, detail={"message": "FINGERPRINT_MISMATCH: Operating System changed", "redirect_url": failure_url})

@@ -73,17 +73,25 @@ async def create_users(request:Request,res:Response,token_id:Optional[str]=None)
         )
     
     auth_user=jwt.decode(token['token'],options={"verify_signature": False})
+    user_email = auth_user.get('email', '')
+    raw_name = auth_user.get('name')
+    if not raw_name or str(raw_name).strip() in ['', 'None', 'null', 'undefined']:
+        user_name = user_email.split('@')[0] if user_email and '@' in user_email else ''
+    else:
+        user_name = raw_name
+
+    profile_pic = auth_user.get('profile_picture') or ''
 
     formatted_user=User(
-        name=auth_user['name'],
-        email=auth_user['email'],
+        name=user_name,
+        email=user_email,
         secrets={},
         remove_branding=False,
         max_keys=2
     )
 
     create_user(formatted_user)
-    json_formatted=json.dumps({'user_email':auth_user['email']})
+    json_formatted=json.dumps({'user_email':user_email})
     ic(json_formatted)
     encrypted_data=encrypt_data(json_formatted)
     ic(encrypted_data)
@@ -91,10 +99,10 @@ async def create_users(request:Request,res:Response,token_id:Optional[str]=None)
     refresh_token=generate_jwt_token(data={'data':encrypted_data},exp_days=5,alg=DEB_USER_REFRESH_JWT_ALGORITHM,key=DEB_USER_REFRESH_KEY)
     ic(token)
     
-    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={auth_user["profile_picture"]}&name={auth_user["name"]}&access_token={access_token}&refresh_token={refresh_token}',status_code=302)
+    response=RedirectResponse(url=f'{FRONTEND_URL}?profile={profile_pic}&name={user_name}&email={user_email}&access_token={access_token}&refresh_token={refresh_token}',status_code=302)
     # response.set_cookie(key="token",value=token,httponly=True,samesite='none',secure=True)
     ic(response.headers,response.__dict__)
-    # return {"redirect_url":f'{FRONTEND_URL}?profile={auth_user['profile_picture']}&name={auth_user['name']}'}
+    # return {"redirect_url":f'{FRONTEND_URL}?profile={profile_pic}&name={user_name}'}
     return response
 
 @router.post("/user/secrets")

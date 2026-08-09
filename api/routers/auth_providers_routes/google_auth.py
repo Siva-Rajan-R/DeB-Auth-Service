@@ -28,8 +28,13 @@ router=APIRouter(
     tags=["Google Authentication"]
 )
 
-@router.get("/auth/google/login/{request_id}")
-async def google_login(request: Request, request_id: str):
+@router.get("/auth/google/login/{auth_token}")
+async def google_login(request: Request, auth_token: str):
+    verified_secret: dict = verify_url_secret(url_secret=auth_token, request=request) or {}
+    request_id: str = verified_secret.get('auth_id')
+    if not request_id or not await redis_get(request_id):
+        raise SessionExpired(redirect_url=verified_secret.get("redirect_url", '/'))
+
     state = await get_and_validate_auth_state(request, request_id, required_step="device_validation")
     
     if "provider_selection" not in state.completed_steps:
@@ -90,9 +95,16 @@ async def google_login_callback(request:Request,code: str, state: str):
     
     user_info:dict = jwt.decode(id_token, options={"verify_signature": False})
     
+    email_val = user_info.get('email', '')
+    raw_name = user_info.get('name')
+    if not raw_name or str(raw_name).strip() in ['', 'None', 'null', 'undefined']:
+        user_name = email_val.split('@')[0] if email_val and '@' in email_val else ''
+    else:
+        user_name = raw_name
+
     auth_user = {
-        'email': user_info['email'],
-        'name': user_info.get('name'),
+        'email': email_val,
+        'name': user_name,
         'profile_picture': user_info.get('picture'),
         'custom_fields': auth_state.auth_data.get('custom_fields', {}),
         'config': auth_state.config,
