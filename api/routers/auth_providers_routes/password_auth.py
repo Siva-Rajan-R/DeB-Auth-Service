@@ -15,6 +15,8 @@ class PasswordAuthSchema(BaseModel):
     password: str
     fullname: Optional[str] = ""
     custom_fields: Optional[Dict[str, Any]] = {}
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 @router.post("/auth/login/password")
 async def password_login(inp: PasswordAuthSchema, request: Request):

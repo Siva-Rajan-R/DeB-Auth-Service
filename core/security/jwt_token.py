@@ -18,7 +18,7 @@ def generate_jwt_token(data:dict,exp_min:int=0,exp_sec:int=0,exp_days:int=0,alg:
     try:
         if exp_min==0 and exp_sec==0 and exp_days==0:
             raise ValueError("only one of exp_min,exp_sec,exp_days should be provided")
-        data['iss']="DeB-Auth-Service"
+        data['iss']="DAuth"
         data['iat']=datetime.now(timezone.utc)
         data['exp']=datetime.now(timezone.utc)+timedelta(minutes=exp_min,seconds=exp_sec,days=exp_days)
         return pyjwt_obj.encode(payload=data,key=key,algorithm=alg)

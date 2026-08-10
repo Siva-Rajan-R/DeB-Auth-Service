@@ -73,3 +73,21 @@ def upload_logo_to_minio(file_data, file_name: str, content_type: str) -> str:
     except Exception as e:
         ic(f"MinIO unexpected error during upload: {e}")
         raise RuntimeError(f"Storage upload failed: {e}")
+
+def delete_logo_from_minio(url: str):
+    """
+    Deletes a logo from MinIO given its public URL.
+    """
+    if not minio_client or not url:
+        return
+        
+    try:
+        # Extract the file name from the URL (everything after the last slash)
+        file_name = url.split('/')[-1]
+        
+        # We only delete if it looks like one of our generated logos
+        if file_name and file_name.startswith('logo_'):
+            minio_client.remove_object(bucket_name, file_name)
+            ic(f"Deleted old logo from MinIO: {file_name}")
+    except Exception as e:
+        ic(f"Failed to delete old logo from MinIO: {e}")

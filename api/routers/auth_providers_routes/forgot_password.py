@@ -55,8 +55,8 @@ async def forgot_password_send(inp: ForgotPasswordSendSchema, request: Request, 
     # Build reset link
     reset_link = f"{FRONTEND_URL}/auth/reset-password/{reset_token}"
 
-    # Get brand name from config
-    brand_name = state.config.get('ui', {}).get('brand_name', 'DeB-Auth')
+    # Retrieve brand name from project UI config, default to 'DAuth'
+    brand_name = state.config.get('ui', {}).get('brand_name', 'DAuth')
 
     # Send email in background
     email_content = forgot_password_email.generate_forgot_password_email_content(

@@ -24,5 +24,6 @@ class AuthState(BaseModel):
     locked_email: Optional[str] = None
     locked_phone: Optional[str] = None
     lock_method: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     additional_infos: Optional[Dict[str, Any]] = None
-

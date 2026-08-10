@@ -1,8 +1,8 @@
-from fastapi import APIRouter,Request,HTTPException
+from fastapi import APIRouter,Request,HTTPException,BackgroundTasks
 from typing import Optional, Dict, Any
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from operations.fb_operations.users_crud import check_apikey_exists,get_user_by_email
+from operations.mongo_operations.users_crud import check_apikey_exists,get_user_by_email
 from core.security.unique_id import generate_unique_id
 from operations.redis_operations.handlers import redis_set,redis_get,redis_unlink 
 from hashlib import sha256
@@ -10,8 +10,9 @@ from exceptions.session_exp import SessionExpired
 from icecream import ic 
 from utils.url_secret_generator import generate_url_secret,verify_url_secret
 from operations.redis_operations.session_manager import get_global_session, extend_global_session
-from operations.fb_operations.end_users_crud import get_all_end_users, update_end_user
+from operations.mongo_operations.end_users_crud import get_all_end_users, update_end_user
 from utils.redirectcode_genereator import generate_redirect_code
+from operations.mongo_operations.analytics_crud import log_auth_request
 
 from schemas.auth_state_schema import AuthState, DeviceFingerprint
 from api.dependencies.auth_state import get_and_validate_auth_state
@@ -31,8 +32,8 @@ class AuthSchema(BaseModel):
     additional_infos: Optional[Dict[str, Any]] = None
 
 @router.post("/auth")
-async def authenticate(inp:AuthSchema,request:Request):    
-    configurations=check_apikey_exists(inp.apikey)
+async def authenticate(inp:AuthSchema,request:Request, bgt:BackgroundTasks=None):    
+    configurations=await check_apikey_exists(inp.apikey)
     auth_id=generate_unique_id(inp.apikey)
     
     state = AuthState(
@@ -52,9 +53,8 @@ async def authenticate(inp:AuthSchema,request:Request):
     }
 
 
-# for generating login page based on login url
 @router.get("/auth/login/{auth_id}")
-async def login_page(auth_id:str,request:Request):
+async def login_page(auth_id:str,request:Request, bgt: BackgroundTasks):
     auth_values=await redis_get(key=auth_id)
     ic(auth_values)
     if not auth_values:
@@ -73,7 +73,7 @@ async def login_page(auth_id:str,request:Request):
             session = await get_global_session(global_session_id)
             if session:
                 product_id = auth_values['apikey']
-                users = get_all_end_users(product_id)
+                users = await get_all_end_users(product_id)
                 user = next((u for u in users if u.id == session.user_id), None)
                 if user:
                     await extend_global_session(global_session_id)
@@ -116,6 +116,8 @@ class InitAuthRequest(BaseModel):
     prefill_email: str = ""              # Optional: lock this email for the whole session
     prefill_phone: str = ""              # Optional: lock this phone for the whole session
     lock_method: str = ""                # Optional: lock method used
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 @router.post("/api/auth/request/{request_id}/init")
 async def init_auth_flow(
@@ -127,6 +129,12 @@ async def init_auth_flow(
     # Lock the flow type and capture fingerprint
     state.flow_type = inp.flow_type
     state.status = "active"
+    
+    if state.config.get('location_based_auth'):
+        if inp.latitude is None or inp.longitude is None:
+            raise HTTPException(status_code=403, detail="Location permissions are required for authentication in this app.")
+        state.latitude = inp.latitude
+        state.longitude = inp.longitude
     
     if "device_validation" not in state.completed_steps:
         state.completed_steps.append("device_validation")
@@ -216,7 +224,7 @@ async def init_auth_flow(
                     cur_browser = request.headers.get("User-Agent", "unknown")
                     if session.device_info == cur_browser:
                         product_id = state.client_id
-                        users = get_all_end_users(product_id)
+                        users = await get_all_end_users(product_id)
                         user = next((u for u in users if u.email == session.user_id or u.id == session.user_id), None)
                         if user:
                             await extend_global_session(global_session_id)
@@ -226,7 +234,7 @@ async def init_auth_flow(
                             site_info = {"url": client_origin or caller_host, "timestamp": time.time()}
                             if site_info["url"] not in [s.get("url") for s in user.custom_fields['signed_in_sites'] if isinstance(s, dict)]:
                                 user.custom_fields['signed_in_sites'].append(site_info)
-                            update_end_user(product_id, user)
+                            await update_end_user(product_id, user)
 
                             auth_user = {
                                 'email': user.email,
@@ -289,7 +297,8 @@ async def get_authenticated_user(inp:AuthenticatedUserSchema,request:Request):
             detail="invalid client id"
         )
     
-    if not get_user_by_email(authenticated_user['user_email']).get('secrets',{}).get(inp.client_id,None)==inp.client_secret:
+    user_data = await get_user_by_email(authenticated_user['user_email'])
+    if not user_data or user_data.get('secrets',{}).get(inp.client_id,None)!=inp.client_secret:
         raise HTTPException(
             status_code=403,
             detail="invalid client secret"

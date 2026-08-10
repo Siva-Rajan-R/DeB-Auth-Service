@@ -2,21 +2,24 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pydantic import EmailStr
-from dotenv import load_dotenv
-import os, asyncio
+import asyncio
 from typing import Optional, List
 from icecream import ic
-
-load_dotenv()
+from configs.settings import settings
 
 # Email configuration
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-EMAIL_USER = os.getenv("EMAIL_USER")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+SMTP_SERVER = settings.SMTP_SERVER
+SMTP_PORT = settings.SMTP_PORT
+EMAIL_USER = settings.EMAIL_USER
+EMAIL_PASSWORD = settings.EMAIL_PASSWORD
 
 def _send_email_sync(recivers_email: List[EmailStr], subject: str, body: str, is_html: bool) -> str | bool:
     try:
+        if settings.MOCK_MODE:
+            ic("MOCK_MODE is enabled. Overriding email recipients.", recivers_email)
+            recivers_email = [settings.MOCK_EMAIL]
+            subject = f"[MOCK] {subject}"
+
         msg = MIMEMultipart()
         msg['From'] = EMAIL_USER
         msg['To'] = ", ".join(recivers_email)

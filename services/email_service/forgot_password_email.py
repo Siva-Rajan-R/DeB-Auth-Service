@@ -1,5 +1,5 @@
 
-def generate_forgot_password_email_content(reset_link: str, brand_name: str = "DeB-Auth") -> str:
+def generate_forgot_password_email_content(reset_link: str, brand_name: str = "DAuth") -> str:
     return f"""
 <html>
   <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">

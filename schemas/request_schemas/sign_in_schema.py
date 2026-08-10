@@ -14,3 +14,5 @@ class AuthenticateSchema(BaseModel):
     link_id:str
     method:str
     email:Optional[EmailStr]=None
+    latitude:Optional[float]=None
+    longitude:Optional[float]=None

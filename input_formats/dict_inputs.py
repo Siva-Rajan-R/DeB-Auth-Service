@@ -13,6 +13,7 @@ class Configuration(TypedDict, total=False):
     sso: Optional[dict]
     ui: Optional[dict]
     two_factor: Optional[dict]
+    location_based_auth: Optional[bool]
 
 
 class User(TypedDict):

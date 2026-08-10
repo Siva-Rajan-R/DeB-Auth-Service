@@ -61,11 +61,13 @@ class CreateUserSettingDbSchema(BaseModel):
     id:str
     user_id:str
     sso_enabled:Optional[bool]=False
+    location_based_auth:Optional[bool]=False
 
 class UpdateUserSettingDbSchema(BaseModel):
     id:str
     user_id:str
     sso_enabled:Optional[bool]=False
+    location_based_auth:Optional[bool]=False
 
 class DeleteUserSettingDbSchema(BaseModel):
     id:str

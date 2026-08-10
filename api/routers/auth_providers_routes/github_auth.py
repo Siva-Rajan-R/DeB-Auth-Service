@@ -1,6 +1,6 @@
 from fastapi import APIRouter,HTTPException,Request
 from fastapi.responses import RedirectResponse
-from operations.fb_operations.users_crud import get_user_by_email
+from operations.mongo_operations.users_crud import get_user_by_email
 from core.security.unique_id import generate_unique_id
 from core.security.jwt_token import generate_jwt_token
 from core.security.jwt_token import generate_jwt_token

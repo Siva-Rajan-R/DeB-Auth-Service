@@ -1,11 +1,11 @@
 from fastapi import FastAPI,Request,routing
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from api.routers import deb_user_routes,auth_routes
+from api.routers import deb_user_routes,auth_routes, billing_routes, analytics_routes
 from api.routers.auth_providers_routes import otp_auth,google_auth,github_auth,facebook_auth,password_auth,forgot_password,two_factor_auth
 
 from api.routers import admin_routes
-from operations.fb_operations.users_crud import create_debuggers_cred,ic
+from operations.mongo_operations.users_crud import create_debuggers_cred,ic
 from starlette.middleware.cors import CORSMiddleware
 from middlewares.invalid_route_middleware import InvalidRouteHandleMiddleware
 from exceptions import session_exp
@@ -18,15 +18,26 @@ load_dotenv()
 if sys.platform!='win32':
     import uvloop,asyncio
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+from contextlib import asynccontextmanager
+import asyncio
+from operations.mongo_operations.cron_jobs import check_and_notify_subscriptions
 
-def lifespan(app : FastAPI):
+async def cron_loop():
+    while True:
+        await check_and_notify_subscriptions()
+        await asyncio.sleep(60)
+
+@asynccontextmanager
+async def lifespan(app : FastAPI):
     try:
-        ic(create_debuggers_cred(os.getenv("REDIRECT_BASEURL")))
-        yield
+        ic(await create_debuggers_cred(os.getenv("REDIRECT_BASEURL")))
     except Exception as e:
         ic(e)
-    finally:
-        ic("Server stopped...")
+    
+    cron_task = asyncio.create_task(cron_loop())
+    yield
+    cron_task.cancel()
+    ic("Server stopped...")
 
 docs_url='/docs'
 redoc_url='/redoc'
@@ -60,6 +71,8 @@ app.include_router(two_factor_auth.router)
 
 # Admin Routes
 app.include_router(admin_routes.router)
+app.include_router(billing_routes.router)
+app.include_router(analytics_routes.router)
 
 
 template=Jinja2Templates("templates")

@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel,EmailStr
 from typing import Optional
-from operations.fb_operations.users_crud import check_apikey_exists,get_user_by_email
+from operations.mongo_operations.users_crud import check_apikey_exists,get_user_by_email
 from core.security.unique_id import generate_unique_id
 from core.security.otp import generate_otp
 from exceptions.session_exp import SessionExpired
@@ -18,6 +18,7 @@ from operations.redis_operations.handlers import redis_set,redis_get,redis_unlin
 from utils.redirectcode_genereator import generate_redirect_code
 from utils.url_secret_generator import verify_url_secret
 from api.dependencies.auth_state import get_and_validate_auth_state
+from operations.mongo_operations.analytics_crud import log_sms_otp_dispatch, log_audit_event
 load_dotenv()
 
 
@@ -79,6 +80,10 @@ async def otp_page(inp: OtpSendSchema, request:Request, bgt:BackgroundTasks):
                 detail="Failed to send OTP to mobile number."
             )
             
+        # Log SMS OTP dispatch asynchronously
+        bgt.add_task(log_sms_otp_dispatch, state.client_id)
+        bgt.add_task(log_audit_event, state.client_id, request.client.host if request.client else "unknown", "otp-phone", mobile_number, "OTP_REQUEST", "Ongoing")
+            
         # Use a dummy email for systems expecting email uniqueness / presence
         email = inp.email or ""
         
@@ -107,6 +112,7 @@ async def otp_page(inp: OtpSendSchema, request:Request, bgt:BackgroundTasks):
         ic(otp)
         email_content=otp_email.generate_otp_email_content(otp=otp)
         bgt.add_task(main.send_email,recivers_email=[email],subject="Otp From DeB-Authentication Service",body=email_content,is_html=True)
+        bgt.add_task(log_audit_event, state.client_id, request.client.host if request.client else "unknown", "otp-email", email, "OTP_REQUEST", "Ongoing")
         
         state.auth_data = {
             'email': email,
@@ -138,6 +144,10 @@ async def verify_otp(inp: OtpVerifySchema, request:Request):
         state.status = "failed"
         await redis_set(key=inp.request_id, value=state.model_dump(), exp=60)
         
+        # Log failure
+        import asyncio
+        asyncio.create_task(log_audit_event(state.client_id, request.client.host if request.client else "unknown", auth_data.get('auth_provider', 'otp'), auth_data.get('mobile_number') or auth_data.get('email'), "LOGIN_FAILED", "FAILED"))
+        
         redirect_urls = state.config.get('redirect_urls', {})
         failure_url = redirect_urls.get('signup_failure') if state.flow_type == 'signup' else redirect_urls.get('signin_failure')
         
@@ -161,6 +171,9 @@ async def verify_otp(inp: OtpVerifySchema, request:Request):
             auth_data['verify_count'] = auth_data.get('verify_count', 0) + 1
             state.auth_data = auth_data
             await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)
+            
+            import asyncio
+            asyncio.create_task(log_audit_event(state.client_id, request.client.host if request.client else "unknown", auth_data.get('auth_provider', 'otp'), auth_data.get('mobile_number') or auth_data.get('email'), "LOGIN_FAILED", "FAILED"))
             raise HTTPException(status_code=422, detail="invalid otp")
     else:
         # Local email OTP verification
@@ -168,6 +181,9 @@ async def verify_otp(inp: OtpVerifySchema, request:Request):
             auth_data['verify_count'] = auth_data.get('verify_count', 0) + 1
             state.auth_data = auth_data
             await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)
+            
+            import asyncio
+            asyncio.create_task(log_audit_event(state.client_id, request.client.host if request.client else "unknown", auth_data.get('auth_provider', 'otp'), auth_data.get('mobile_number') or auth_data.get('email'), "LOGIN_FAILED", "FAILED"))
             raise HTTPException(status_code=422, detail="invalid otp")
 
     # OTP Verified Successfully
@@ -192,7 +208,7 @@ async def verify_otp(inp: OtpVerifySchema, request:Request):
         'config': state.config,
         'apikey': state.client_id,
         'flow_type': state.flow_type,
-        'auth_provider': 'otp'
+        'auth_provider': auth_data.get('auth_provider', 'otp')
     }
     
     return await generate_redirect_code(

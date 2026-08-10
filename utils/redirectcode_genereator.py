@@ -5,12 +5,14 @@ import time
 from hashlib import sha256
 from core.security.jwt_token import generate_jwt_token
 from icecream import ic
-from operations.fb_operations.users_crud import get_user_by_email
-from operations.fb_operations.end_users_crud import get_end_user_by_email as get_sso_user, create_end_user as create_sso_user, update_end_user
+from operations.mongo_operations.users_crud import get_user_by_email
+from operations.mongo_operations.end_users_crud import get_end_user_by_email as get_sso_user, create_end_user as create_sso_user, update_end_user
 
 from operations.redis_operations.handlers import redis_set,redis_get,redis_unlink,redis_curttl
 from operations.redis_operations.session_manager import create_global_session, create_product_session, get_global_session
 from schemas.db_schemas.end_user_schema import EndUser
+from operations.mongo_operations.analytics_crud import log_audit_event, log_auth_request
+import asyncio
 
 async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False, request=None, return_json:bool=False):
     session_data = await redis_get(auth_id) or {}
@@ -22,8 +24,9 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
     await redis_unlink(auth_id)
     ic(extracted_auth_dict)
     suffix_token=secrets.token_urlsafe(10)
-    secret:dict=get_user_by_email(extracted_auth_dict['config']['user_email']).get('secrets',{})
-    client_secret:str=secret.get(extracted_auth_dict['apikey'],None)
+    user_data = await get_user_by_email(extracted_auth_dict['config']['user_email'])
+    secret:dict = user_data.get('secrets',{}) if user_data else {}
+    client_secret:str = secret.get(extracted_auth_dict['apikey'],None)
 
     if not client_secret:
         raise HTTPException(
@@ -48,12 +51,30 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         'auth_provider': auth_user.get('auth_provider', 'unknown'),
         'prefilled': prefilled,
         'lock_method': lock_method or None,
-        'additional_infos': session_data.get('additional_infos')
+        'additional_infos': session_data.get('additional_infos'),
+        'location': {
+            'lat': session_data.get('latitude'),
+            'lng': session_data.get('longitude')
+        } if session_data.get('latitude') is not None else None
     }
 
     if request:
         jwt_payload['ip'] = request.client.host if request.client else "unknown"
         jwt_payload['browser'] = request.headers.get("User-Agent", "unknown")
+
+    ip_addr = request.client.host if request and request.client else "unknown"
+    asyncio.create_task(log_audit_event(
+        extracted_auth_dict['apikey'],
+        ip_addr,
+        auth_user.get('auth_provider', 'unknown'),
+        auth_user.get('email') or auth_user.get('mobile_number') or "unknown",
+        "LOGIN_SUCCESS",
+        "SUCCESS"
+    ))
+    asyncio.create_task(log_auth_request(
+        extracted_auth_dict['apikey'],
+        auth_user.get('auth_provider', 'unknown')
+    ))
 
     if auth_user.get('auth_provider') == 'password' and 'password' in auth_user:
         jwt_payload['password'] = auth_user['password']
@@ -89,7 +110,7 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         user_email = auth_user['email']
         
         # Check if EndUser exists, if not create
-        sso_user = get_sso_user(product_id, user_email)
+        sso_user = await get_sso_user(product_id, user_email)
         if not sso_user:
             sso_user = EndUser(
                 id=secrets.token_hex(16),
@@ -100,7 +121,7 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
                 created_at=time.time(),
                 custom_fields=auth_user.get('custom_fields', {})
             )
-            create_sso_user(product_id, sso_user)
+            await create_sso_user(product_id, sso_user)
             
         # Determine best cookie domain for cross-subdomain SSO sharing
         client_origin = request.headers.get("origin") or request.headers.get("referer") or ""
@@ -137,7 +158,7 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
                 site_info = {"url": client_origin or caller_host, "timestamp": time.time()}
                 if site_info["url"] not in [s.get("url") for s in sso_user.custom_fields['signed_in_sites'] if isinstance(s, dict)]:
                     sso_user.custom_fields['signed_in_sites'].append(site_info)
-                update_end_user(product_id, sso_user)
+                await update_end_user(product_id, sso_user)
                 break
 
         global_session_id = request.cookies.get("global_session_id")
