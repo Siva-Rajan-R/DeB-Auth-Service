@@ -54,7 +54,7 @@ DEB_USER_REFRESH_KEY=os.getenv("DEB_USER_REFRESH_KEY")
 async def user_auth(request:Request):
     response=await authenticate(
         inp=AuthSchema(
-            apikey=os.getenv("DEB_APIKEY"),
+            apikey=os.getenv("DEB_APIKEY", ""),
         ),
         request=request
     )
@@ -70,7 +70,7 @@ async def create_users(request:Request,res:Response,token_id:Optional[str]=None)
             message="Authentication Falied redirecting to DeB-Auth-Service"
         )
     
-    token=await get_authenticated_user(inp=AuthenticatedUserSchema(token_id=token_id,client_id=os.getenv("DEB_APIKEY"),client_secret=os.getenv("DEB_CLIENT_SECRET")),request=request)
+    token=await get_authenticated_user(inp=AuthenticatedUserSchema(token_id=token_id,client_id=os.getenv("DEB_APIKEY", ""),client_secret=os.getenv("DEB_CLIENT_SECRET", "")),request=request)
     ic(token)
     if not token.get('token',None):
         raise HTTPException(

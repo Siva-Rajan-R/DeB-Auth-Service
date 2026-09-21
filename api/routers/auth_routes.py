@@ -12,6 +12,7 @@ from utils.url_secret_generator import generate_url_secret,verify_url_secret
 from operations.redis_operations.session_manager import get_global_session, extend_global_session
 from operations.mongo_operations.end_users_crud import get_all_end_users, update_end_user
 from utils.redirectcode_genereator import generate_redirect_code
+from utils.verification_service import perform_external_verification
 from operations.mongo_operations.analytics_crud import log_auth_request
 
 from schemas.auth_state_schema import AuthState, DeviceFingerprint
@@ -323,7 +324,41 @@ async def signup_complete(inp: SignupCompleteSchema, request: Request):
         raise HTTPException(status_code=403, detail="Invalid flow state for signup complete")
 
     auth_data = state.auth_data
-    auth_data['custom_fields'] = {**auth_data.get('custom_fields', {}), **inp.custom_fields}
+    merged_custom_fields = {**auth_data.get('custom_fields', {}), **inp.custom_fields}
+    auth_data['custom_fields'] = merged_custom_fields
+
+    redirect_urls = state.config.get('redirect_urls', {})
+    verification_url = redirect_urls.get('signup_verification') or redirect_urls.get('verification_url')
+    failure_url = redirect_urls.get('signup_failure')
+
+    verify_payload = {
+        'request_id': inp.request_id,
+        'flow_type': 'signup',
+        'auth_provider': auth_data.get('auth_provider', 'signup'),
+        'email': auth_data.get('email'),
+        'mobile_number': auth_data.get('mobile_number'),
+        'full_name': auth_data.get('full_name'),
+        'custom_fields': merged_custom_fields,
+        'ip': request.client.host if request.client else "unknown",
+        'user_agent': request.headers.get("User-Agent", "unknown"),
+        'client_id': state.client_id
+    }
+
+    verify_result = await perform_external_verification(
+        verification_url=verification_url,
+        failure_url=failure_url,
+        payload=verify_payload,
+        request=request,
+        client_id=state.client_id,
+        auth_provider=auth_data.get('auth_provider', 'signup'),
+        identifier=auth_data.get('email') or auth_data.get('mobile_number') or "unknown"
+    )
+
+    if isinstance(verify_result, dict):
+        if verify_result.get('custom_fields'):
+            auth_data['custom_fields'] = {**auth_data['custom_fields'], **verify_result['custom_fields']}
+        if verify_result.get('full_name') or verify_result.get('name'):
+            auth_data['full_name'] = verify_result.get('full_name') or verify_result.get('name')
     
     state.status = "completed"
     await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)
@@ -335,7 +370,8 @@ async def signup_complete(inp: SignupCompleteSchema, request: Request):
         'custom_fields': auth_data['custom_fields'],
         'config': state.config,
         'apikey': state.client_id,
-        'auth_provider': auth_data.get('auth_provider', 'unknown')
+        'flow_type': 'signup',
+        'auth_provider': auth_data.get('auth_provider', 'signup')
     }
     
     return await generate_redirect_code(

@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     REDIRECT_BASEURL: str = "http://127.0.0.1:8000"
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # SMS / MSG91
+    MSG91_AUTH_KEY: Optional[str] = None
+    MSG91_TEMPLATE_ID: Optional[str] = None
+    MSG91_WIDGET_ID: Optional[str] = None
+    MOC_OTP: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

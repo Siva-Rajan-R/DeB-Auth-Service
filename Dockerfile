@@ -19,7 +19,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["gunicorn", "main:app", \
-    "-k", "uvicorn.workers.UvicornWorker", \
-    "--bind", "0.0.0.0:8000", \
-    "--workers", "2"]
+CMD ["gunicorn", "main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--forwarded-allow-ips=*"]

@@ -9,13 +9,14 @@ from core.security.otp import generate_otp
 from exceptions.session_exp import SessionExpired
 from icecream import ic
 from services.email_service import main,otp_email
-from services.message_central import MessageCentral
+from services.msg91_service import msg91_service
 import secrets
 from hashlib import sha256
 from dotenv import load_dotenv
 import os
 from operations.redis_operations.handlers import redis_set,redis_get,redis_unlink,redis_curttl
 from utils.redirectcode_genereator import generate_redirect_code
+from utils.verification_service import perform_external_verification
 from utils.url_secret_generator import verify_url_secret
 from api.dependencies.auth_state import get_and_validate_auth_state
 from operations.mongo_operations.analytics_crud import log_sms_otp_dispatch, log_audit_event
@@ -67,12 +68,10 @@ async def otp_page(inp: OtpSendSchema, request:Request, bgt:BackgroundTasks):
                 }
             )
             
-        mc = MessageCentral()
         try:
-            res = await mc.send_otp(phone=mobile_number)
-            verification_id = res.get("data", {}).get("verificationId")
+            verification_id = await msg91_service.send_otp(mobile_number=mobile_number)
             if not verification_id:
-                raise Exception("Did not receive verificationId from Message Central.")
+                raise Exception("Did not receive verificationId from MSG91.")
         except Exception as e:
             ic(f"Error sending mobile OTP: {e}")
             raise HTTPException(
@@ -158,14 +157,11 @@ async def verify_otp(inp: OtpVerifySchema, request:Request):
     
     verification_id = auth_data.get('verification_id')
     if verification_id:
-        # Message Central OTP Verification
-        mc = MessageCentral()
+        # MSG91 OTP Verification
         try:
-            res = await mc.verify_otp(verification_id=verification_id, otp=otp)
-            status_code = res.get("responseCode")
-            # Usually 200 is success. Let's check responseCode.
-            if status_code != 200:
-                raise Exception(f"Message Central validation failed: {res}")
+            is_valid = await msg91_service.verify_otp(verification_id=verification_id, code=otp, mobile_number=auth_data.get('mobile_number'))
+            if not is_valid:
+                raise Exception("MSG91 validation failed")
         except Exception as e:
             ic(f"Mobile OTP verification failed: {e}")
             auth_data['verify_count'] = auth_data.get('verify_count', 0) + 1
@@ -195,6 +191,45 @@ async def verify_otp(inp: OtpVerifySchema, request:Request):
         await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)
         return {"success": True, "next_step": "additional_fields"}
     
+    redirect_urls = state.config.get('redirect_urls', {})
+    is_signup = state.flow_type == 'signup'
+    verification_url = (
+        redirect_urls.get('signup_verification') if is_signup else redirect_urls.get('signin_verification')
+    ) or redirect_urls.get('verification_url')
+    failure_url = (
+        redirect_urls.get('signup_failure') if is_signup else redirect_urls.get('signin_failure')
+    )
+
+    verify_payload = {
+        'request_id': inp.request_id,
+        'flow_type': state.flow_type,
+        'auth_provider': auth_data.get('auth_provider', 'otp'),
+        'email': auth_data.get('email'),
+        'mobile_number': auth_data.get('mobile_number'),
+        'full_name': auth_data.get('full_name'),
+        'custom_fields': auth_data.get('custom_fields', {}),
+        'ip': request.client.host if request.client else "unknown",
+        'user_agent': request.headers.get("User-Agent", "unknown"),
+        'client_id': state.client_id
+    }
+
+    # Call external verification endpoint if configured
+    verify_result = await perform_external_verification(
+        verification_url=verification_url,
+        failure_url=failure_url,
+        payload=verify_payload,
+        request=request,
+        client_id=state.client_id,
+        auth_provider=auth_data.get('auth_provider', 'otp'),
+        identifier=auth_data.get('email') or auth_data.get('mobile_number') or "unknown"
+    )
+
+    if isinstance(verify_result, dict):
+        if verify_result.get('custom_fields'):
+            auth_data['custom_fields'] = {**(auth_data.get('custom_fields') or {}), **verify_result['custom_fields']}
+        if verify_result.get('full_name') or verify_result.get('name'):
+            auth_data['full_name'] = verify_result.get('full_name') or verify_result.get('name')
+
     # Otherwise finish auth
     state.status = "completed"
     await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)

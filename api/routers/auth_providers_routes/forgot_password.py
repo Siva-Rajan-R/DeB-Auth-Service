@@ -106,7 +106,7 @@ async def forgot_password_reset(inp: ForgotPasswordResetSchema, request: Request
         'config': reset_data['config'],
         'apikey': reset_data['client_id'],
         'flow_type': 'password_reset',
-        'auth_provider': 'password',
+        'auth_provider': 'forgot-password',
         'password': inp.new_password,
     }
 

@@ -173,7 +173,7 @@ async def get_audit_logs(
 @router.get("/analytics/{apikey}/otp-breakdown")
 async def get_otp_breakdown(
     apikey: str,
-    by: str = Query("ip", regex="^(ip|user)$"),
+    by: str = Query("ip", pattern="^(ip|user)$"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),

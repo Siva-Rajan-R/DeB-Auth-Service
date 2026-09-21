@@ -4,8 +4,7 @@ from operations.mongo_operations.users_crud import get_user_by_email
 from core.security.unique_id import generate_unique_id
 from core.security.otp import generate_otp
 from core.security.jwt_token import generate_jwt_token
-from core.security.jwt_token import generate_jwt_token
-from icecream import ic
+from loguru import logger
 import secrets
 from hashlib import sha256
 from dotenv import load_dotenv
@@ -32,7 +31,7 @@ async def facebook_login(request:Request,auth_token:str):
     verified_secret:dict=verify_url_secret(url_secret=auth_token,request=request) or {}
     auth_id:str=verified_secret.get('auth_id')
     if not await redis_get(auth_id):
-        ic("Invalid Auth Id")
+        logger.warning("Invalid Auth Id")
         raise SessionExpired(redirect_url=verified_secret.get("redirect_url",'/'))
     
     state = generate_unique_id("facebook")
@@ -58,7 +57,7 @@ async def facebook_callback(request:Request,code: str, state: str):
     auth_id:str=verified_secret.get('auth_id')
     
     if not auth_id:
-        ic("inavlid State Parameter")
+        logger.warning("Invalid State Parameter")
         raise SessionExpired(
             redirect_url=verified_secret.get("redirect_url",'/'),
             message="Session Expired redirecting to DeB-Auth-Service"
@@ -75,7 +74,7 @@ async def facebook_callback(request:Request,code: str, state: str):
     async with httpx.AsyncClient() as http:
         token_resp = await http.get(token_url, params=token_params)
         token_data = token_resp.json()
-        ic(token_data)
+        logger.debug(f"Facebook token data: {token_data}")
         access_token = token_data.get("access_token")
         if not access_token:
             raise HTTPException(400, "Failed to get access token")
@@ -97,7 +96,8 @@ async def facebook_callback(request:Request,code: str, state: str):
         auth_user={
             'email':email,
             'name':name,
-            'profile_picture':profile_pic
+            'profile_picture':profile_pic,
+            'auth_provider': 'facebook'
         },
         request=request
     )

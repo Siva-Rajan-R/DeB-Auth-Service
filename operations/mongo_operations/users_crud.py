@@ -251,9 +251,9 @@ async def create_debuggers_cred(base_url: str):
         await create_user(user=user)
 
         await create_secrets(
-            email=os.getenv('DEB_EMAIL'),
-            apikey=os.getenv("DEB_APIKEY"),
-            client_secret=os.getenv('DEB_CLIENT_SECRET'),
+            email=os.getenv('DEB_EMAIL', ""),
+            apikey=os.getenv("DEB_APIKEY", ""),
+            client_secret=os.getenv('DEB_CLIENT_SECRET', ""),
             configurations=Configuration(
                 auth_methods=[
                     {"id": "otp", "name": "OTP", "enabled": True},

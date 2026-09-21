@@ -4,7 +4,7 @@ import secrets
 import time
 from hashlib import sha256
 from core.security.jwt_token import generate_jwt_token
-from icecream import ic
+from loguru import logger
 from operations.mongo_operations.users_crud import get_user_by_email
 from operations.mongo_operations.end_users_crud import get_end_user_by_email as get_sso_user, create_end_user as create_sso_user, update_end_user
 
@@ -14,6 +14,19 @@ from schemas.db_schemas.end_user_schema import EndUser
 from operations.mongo_operations.analytics_crud import log_audit_event, log_auth_request
 import asyncio
 
+def sanitize_redirect_url(url: str, default: str = "/") -> str:
+    if not url:
+        return default
+    cleaned = str(url).strip()
+    if not cleaned:
+        return default
+    if cleaned.startswith(("http://", "https://", "/")):
+        return cleaned
+    if "." in cleaned and not cleaned.startswith("/"):
+        return f"https://{cleaned}"
+    return cleaned
+
+
 async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False, request=None, return_json:bool=False):
     session_data = await redis_get(auth_id) or {}
     
@@ -22,11 +35,16 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         extracted_auth_dict=session_data
 
     await redis_unlink(auth_id)
-    ic(extracted_auth_dict)
+    logger.debug(f"Extracted auth dict: {extracted_auth_dict}")
     suffix_token=secrets.token_urlsafe(10)
-    user_data = await get_user_by_email(extracted_auth_dict['config']['user_email'])
+    
+    config = extracted_auth_dict.get('config', {})
+    user_email = config.get('user_email')
+    user_data = await get_user_by_email(user_email) if user_email else None
     secret:dict = user_data.get('secrets',{}) if user_data else {}
-    client_secret:str = secret.get(extracted_auth_dict['apikey'],None)
+    
+    api_key = extracted_auth_dict.get('client_id') or extracted_auth_dict.get('apikey')
+    client_secret:str = secret.get(api_key, None) if api_key else None
 
     if not client_secret:
         raise HTTPException(
@@ -35,7 +53,7 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         )
     
     auth_code=sha256(client_secret.encode()).hexdigest()[:10]+suffix_token
-    ic(auth_code)
+    logger.debug(f"Generated auth_code: {auth_code}")
 
     locked_email = session_data.get('locked_email')
     locked_phone = session_data.get('locked_phone')
@@ -64,7 +82,7 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
 
     ip_addr = request.client.host if request and request.client else "unknown"
     asyncio.create_task(log_audit_event(
-        extracted_auth_dict['apikey'],
+        api_key,
         ip_addr,
         auth_user.get('auth_provider', 'unknown'),
         auth_user.get('email') or auth_user.get('mobile_number') or "unknown",
@@ -72,11 +90,11 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         "SUCCESS"
     ))
     asyncio.create_task(log_auth_request(
-        extracted_auth_dict['apikey'],
+        api_key,
         auth_user.get('auth_provider', 'unknown')
     ))
 
-    if auth_user.get('auth_provider') == 'password' and 'password' in auth_user:
+    if auth_user.get('auth_provider') in ['password', 'forgot-password'] and 'password' in auth_user:
         jwt_payload['password'] = auth_user['password']
 
     app_token = generate_jwt_token(jwt_payload, exp_min=60)
@@ -84,33 +102,36 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
     authenticated_values={
         'token':app_token,
         'suffix_token':suffix_token,
-        'user_email':extracted_auth_dict['config']['user_email'],
-        'apikey':extracted_auth_dict['apikey']
+        'user_email':user_email,
+        'apikey':api_key
     }
     await redis_set(key=auth_code,value=authenticated_values,exp=300)
-    
-    redirect_urls = extracted_auth_dict.get('config', {}).get('redirect_urls', {})
+
+    redirect_urls = config.get('redirect_urls', {})
     flow_type = extracted_auth_dict.get('flow_type', 'signin')
     
     if flow_type == 'signup':
-        base_url = redirect_urls.get('signup_success') or extracted_auth_dict.get('config', {}).get('redirect_url', '/')
+        raw_url = redirect_urls.get('signup_success') or config.get('redirect_url', '/')
     else:
-        base_url = redirect_urls.get('signin_success') or extracted_auth_dict.get('config', {}).get('redirect_url', '/')
+        raw_url = redirect_urls.get('signin_success') or config.get('redirect_url', '/')
         
-    redirect_url_final = f"{base_url}?token_id={auth_code}"
+    base_url = sanitize_redirect_url(raw_url)
+    separator = "&" if "?" in base_url else "?"
+    redirect_url_final = f"{base_url}{separator}token_id={auth_code}"
+    
     if return_json:
         response = JSONResponse(content={"redirect_url": redirect_url_final})
     else:
         response = RedirectResponse(url=redirect_url_final, status_code=302)
     
     # SSO Logic
-    sso_config = extracted_auth_dict['config'].get('sso', {})
+    sso_config = config.get('sso', {})
     if sso_config.get('enabled', False) and request:
-        product_id = extracted_auth_dict['apikey']
-        user_email = auth_user['email']
+        product_id = api_key
+        user_email_sso = auth_user.get('email')
         
         # Check if EndUser exists, if not create
-        sso_user = await get_sso_user(product_id, user_email)
+        sso_user = await get_sso_user(product_id, user_email_sso)
         if not sso_user:
             sso_user = EndUser(
                 id=secrets.token_hex(16),

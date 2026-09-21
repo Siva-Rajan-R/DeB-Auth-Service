@@ -1,0 +1,72 @@
+2026-08-10 18:52:15 | INFO     | __main__:<module>:1 - Test Info Log
+2026-08-10 18:52:15 | SUCCESS  | __main__:<module>:1 - Test Success Log
+2026-08-10 18:52:15 | WARNING  | __main__:<module>:1 - Test Warning Log
+2026-08-10 18:52:15 | ERROR    | __main__:<module>:1 - Test Error Log
+2026-08-10 19:05:45 | SUCCESS  | __main__:<module>:1 - Backend and Colored Logger are ready to go!
+2026-08-10 19:06:44 | INFO     | logging:callHandlers:1737 - Started server process [23528]
+2026-08-10 19:06:44 | INFO     | logging:callHandlers:1737 - Waiting for application startup.
+2026-08-10 19:06:44 | ERROR    | main:lifespan:40 - Error initializing credentials: 500: something went wrong while adding apikey E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }', 'keyPattern': {'_id': 1}, 'keyValue': {'_id': 'DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk'}}
+2026-08-10 19:06:44 | INFO     | main:lifespan:43 - DAuth Authentication Service started successfully.
+2026-08-10 19:06:44 | INFO     | logging:callHandlers:1737 - Application startup complete.
+2026-08-10 19:08:01 | INFO     | logging:callHandlers:1737 - Shutting down
+2026-08-10 19:08:01 | INFO     | logging:callHandlers:1737 - Waiting for application shutdown.
+2026-08-10 19:08:01 | INFO     | main:lifespan:46 - Server stopped...
+2026-08-10 19:08:01 | INFO     | logging:callHandlers:1737 - Application shutdown complete.
+2026-08-10 19:08:01 | INFO     | logging:callHandlers:1737 - Finished server process [23528]
+2026-08-10 19:08:04 | INFO     | logging:callHandlers:1737 - Started server process [30320]
+2026-08-10 19:08:04 | INFO     | logging:callHandlers:1737 - Waiting for application startup.
+2026-08-10 19:08:04 | ERROR    | main:lifespan:40 - Error initializing credentials: 500: something went wrong while adding apikey E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }', 'keyPattern': {'_id': 1}, 'keyValue': {'_id': 'DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk'}}
+2026-08-10 19:08:04 | INFO     | main:lifespan:43 - DAuth Authentication Service started successfully.
+2026-08-10 19:08:04 | INFO     | logging:callHandlers:1737 - Application startup complete.
+2026-08-10 19:09:00 | INFO     | __main__:<module>:1 - <cyan>➡️  INCOMING</cyan>  | <green>[GET]</green> <white><bold>/user/secrets?apikey=123</bold></white> | From: <magenta>http://localhost:5173</magenta> (IP: <cyan>127.0.0.1</cyan>)
+2026-08-10 19:09:00 | INFO     | __main__:<module>:1 - <green>⬅️  RESPONDED</green> | <green>[GET]</green> <white>/user/secrets</white> | <bold><green>200 OK</green></bold> | Took: <yellow><bold>0.014s</bold> (14.2ms)</yellow> | To: <cyan>127.0.0.1</cyan>
+2026-08-10 19:09:17 | INFO     | logging:callHandlers:1737 - Shutting down
+2026-08-10 19:09:17 | INFO     | logging:callHandlers:1737 - Waiting for application shutdown.
+2026-08-10 19:09:17 | INFO     | main:lifespan:46 - Server stopped...
+2026-08-10 19:09:17 | INFO     | logging:callHandlers:1737 - Application shutdown complete.
+2026-08-10 19:09:17 | INFO     | logging:callHandlers:1737 - Finished server process [30320]
+2026-08-10 19:09:21 | INFO     | logging:callHandlers:1737 - Started server process [21236]
+2026-08-10 19:09:21 | INFO     | logging:callHandlers:1737 - Waiting for application startup.
+2026-08-10 19:09:21 | ERROR    | main:lifespan:40 - Error initializing credentials: 500: something went wrong while adding apikey E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }', 'keyPattern': {'_id': 1}, 'keyValue': {'_id': 'DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk'}}
+2026-08-10 19:09:21 | INFO     | main:lifespan:43 - DAuth Authentication Service started successfully.
+2026-08-10 19:09:21 | INFO     | logging:callHandlers:1737 - Application startup complete.
+2026-08-10 19:09:45 | INFO     | __main__:<module>:1 - <cyan>--> [INCOMING]</cyan> <green>[GET]</green> <white><bold>/user/secrets?apikey=test</bold></white> | From: <magenta>http://localhost:5173</magenta> (IP: <cyan>127.0.0.1</cyan>)
+2026-08-10 19:09:45 | INFO     | __main__:<module>:1 - <green><-- [RESPONDED]</green> <green>[GET]</green> <white>/user/secrets</white> | <bold><green>200 OK</green></bold> | Took: <yellow><bold>0.014s</bold> (14.2ms)</yellow> | To: <cyan>127.0.0.1</cyan>
+2026-08-10 19:11:55 | INFO     | logging:callHandlers:1737 - Shutting down
+2026-08-10 19:11:55 | INFO     | logging:callHandlers:1737 - Waiting for application shutdown.
+2026-08-10 19:11:55 | INFO     | main:lifespan:46 - Server stopped...
+2026-08-10 19:11:55 | INFO     | logging:callHandlers:1737 - Application shutdown complete.
+2026-08-10 19:11:55 | INFO     | logging:callHandlers:1737 - Finished server process [21236]
+2026-08-10 19:11:59 | INFO     | logging:callHandlers:1737 - Started server process [16864]
+2026-08-10 19:11:59 | INFO     | logging:callHandlers:1737 - Waiting for application startup.
+2026-08-10 19:11:59 | ERROR    | main:lifespan:40 - Error initializing credentials: 500: something went wrong while adding apikey E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }', 'keyPattern': {'_id': 1}, 'keyValue': {'_id': 'DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk'}}
+2026-08-10 19:11:59 | INFO     | main:lifespan:43 - DAuth Authentication Service started successfully.
+2026-08-10 19:11:59 | INFO     | logging:callHandlers:1737 - Application startup complete.
+2026-08-10 19:12:44 | INFO     | logging:callHandlers:1737 - Shutting down
+2026-08-10 19:12:44 | INFO     | logging:callHandlers:1737 - Waiting for application shutdown.
+2026-08-10 19:12:44 | INFO     | main:lifespan:46 - Server stopped...
+2026-08-10 19:12:44 | INFO     | logging:callHandlers:1737 - Application shutdown complete.
+2026-08-10 19:12:44 | INFO     | logging:callHandlers:1737 - Finished server process [16864]
+2026-08-10 19:12:47 | INFO     | logging:callHandlers:1737 - Started server process [17872]
+2026-08-10 19:12:47 | INFO     | logging:callHandlers:1737 - Waiting for application startup.
+2026-08-10 19:12:47 | ERROR    | main:lifespan:40 - Error initializing credentials: 500: something went wrong while adding apikey E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }', 'keyPattern': {'_id': 1}, 'keyValue': {'_id': 'DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk'}}
+2026-08-10 19:12:47 | INFO     | main:lifespan:43 - DAuth Authentication Service started successfully.
+2026-08-10 19:12:47 | INFO     | logging:callHandlers:1737 - Application startup complete.
+2026-08-10 19:21:12 | INFO     | core.logger:dispatch:111 - <cyan>--> [INCOMING]</cyan> <green>[GET]</green> <white><bold>/</bold></white> | From: <magenta>testclient</magenta> (IP: <cyan>testclient</cyan>)
+2026-08-10 19:21:12 | INFO     | core.logger:dispatch:126 - <green><-- [RESPONDED]</green> <green>[GET]</green> <white>/</white> | <bold><green>200 OK</green></bold> | Took: <yellow><bold>0.041s</bold> (41.4ms)</yellow> | To: <cyan>testclient</cyan>
+2026-08-10 19:21:12 | INFO     | logging:callHandlers:1737 - HTTP Request: GET http://testserver/ "HTTP/1.1 200 OK"
+2026-08-10 19:24:31 | INFO     | logging:callHandlers:1737 - Shutting down
+2026-08-10 19:24:31 | INFO     | logging:callHandlers:1737 - Waiting for application shutdown.
+2026-08-10 19:24:31 | INFO     | main:lifespan:46 - Server stopped...
+2026-08-10 19:24:31 | INFO     | logging:callHandlers:1737 - Application shutdown complete.
+2026-08-10 19:24:31 | INFO     | logging:callHandlers:1737 - Finished server process [17872]
+2026-08-10 19:24:52 | INFO     | logging:callHandlers:1737 - Started server process [14024]
+2026-08-10 19:24:52 | INFO     | logging:callHandlers:1737 - Waiting for application startup.
+2026-08-10 19:24:52 | ERROR    | main:lifespan:40 - Error initializing credentials: 500: something went wrong while adding apikey E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: dauth_service.dauth_apikeys index: _id_ dup key: { _id: "DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk" }', 'keyPattern': {'_id': 1}, 'keyValue': {'_id': 'DeB-pCRP-C07EthcUz8VjKL-4AUOpVhZBkEpZfqDFOmdhzk'}}
+2026-08-10 19:24:52 | INFO     | main:lifespan:43 - DAuth Authentication Service started successfully.
+2026-08-10 19:24:52 | INFO     | logging:callHandlers:1737 - Application startup complete.
+2026-08-10 19:26:22 | INFO     | logging:callHandlers:1737 - Shutting down
+2026-08-10 19:26:22 | INFO     | logging:callHandlers:1737 - Waiting for application shutdown.
+2026-08-10 19:26:22 | INFO     | main:lifespan:46 - Server stopped...
+2026-08-10 19:26:22 | INFO     | logging:callHandlers:1737 - Application shutdown complete.
+2026-08-10 19:26:22 | INFO     | logging:callHandlers:1737 - Finished server process [14024]

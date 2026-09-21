@@ -34,3 +34,5 @@ pyotp
 qrcode
 minio
 razorpay
+httpx
+loguru

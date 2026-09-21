@@ -15,6 +15,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+from core.logger import setup_logging, logger, ColoredRequestLoggingMiddleware
+
+setup_logging()
+
 if sys.platform!='win32':
     import uvloop,asyncio
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -30,14 +34,16 @@ async def cron_loop():
 @asynccontextmanager
 async def lifespan(app : FastAPI):
     try:
-        ic(await create_debuggers_cred(os.getenv("REDIRECT_BASEURL")))
+        cred_res = await create_debuggers_cred(os.getenv("REDIRECT_BASEURL"))
+        logger.success(f"DAuth credentials initialized: {cred_res}")
     except Exception as e:
-        ic(e)
+        logger.error(f"Error initializing credentials: {e}")
     
     cron_task = asyncio.create_task(cron_loop())
+    logger.info("DAuth Authentication Service started successfully.")
     yield
     cron_task.cancel()
-    ic("Server stopped...")
+    logger.info("Server stopped...")
 
 docs_url='/docs'
 redoc_url='/redoc'
@@ -97,5 +103,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 app.add_middleware(InvalidRouteHandleMiddleware, routes=[r.path for r in app.routes if hasattr(r, 'path')])
+
+# Colored Request Logging Middleware (Outermost - logs 100% of all requests/responses)
+app.add_middleware(ColoredRequestLoggingMiddleware)
+

@@ -2,7 +2,7 @@ from core.security.jwt_token import verfiy_jwt_token,generate_jwt_token
 from core.security.sym_encrypt import decrypt_data,encrypt_data
 from fastapi.requests import Request
 from fastapi.exceptions import HTTPException
-from icecream import ic
+from loguru import logger
 import os,json
 from dotenv import load_dotenv
 load_dotenv()
@@ -23,20 +23,17 @@ def verify_user(request:Request):
                 detail="Authorization header missing"
             )
         
-        ic(bearer_token)
-        ic('here')
-        if not bearer_token and 'Bearer' not in bearer_token:
+        logger.debug(f"Bearer token present")
+        if not bearer_token or 'Bearer' not in bearer_token:
             raise HTTPException(
                 status_code=422,
                 detail="Invalid token type"
             )
         bearer,token = bearer_token.split(' ')
-        ic(bearer,token)
         verified_token=verfiy_jwt_token(jwt_token=token,key=DEB_USER_JWT_KEY,alg=DEB_USER_JWT_ALGORITHM)
-        ic(verified_token)
         if verified_token:
             decrypted_data=decrypt_data(verified_token['data'])
-            ic(decrypted_data)
+            logger.debug(f"decrypted_data: {decrypted_data}")
             if not decrypted_data:
                 raise HTTPException(
                     status_code=401,
@@ -48,7 +45,7 @@ def verify_user(request:Request):
         raise
 
     except Exception as e: 
-        ic(f"something went wrong while verifying token {e}")
+        logger.error(f"something went wrong while verifying token {e}")
         raise HTTPException(
             status_code=500,
             detail={'msg':f"something went wrong while verifying token {e}",'logout':True}
