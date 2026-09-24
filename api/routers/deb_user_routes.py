@@ -151,22 +151,30 @@ async def remove_user_apikey(apikey:str,user_email:str=Depends(verify_user)):
 async def revoke_active_sessions_for_apikey(apikey: str):
     try:
         from configs.redis_config import redis
-        import json
-        async for key in redis.scan_iter("*"):
-            data = await redis.get(key)
-            if data:
+        import json, asyncio
+        
+        async def _scan_and_revoke():
+            async for key in redis.scan_iter("*", count=100):
                 try:
-                    val = json.loads(data)
-                    if isinstance(val, dict) and val.get("client_id") == apikey:
-                        val["status"] = "revoked"
-                        await redis.set(name=key, value=json.dumps(val), ex=300)
+                    data = await redis.get(key)
+                    if data:
+                        val = json.loads(data)
+                        if isinstance(val, dict) and val.get("client_id") == apikey:
+                            val["status"] = "revoked"
+                            await redis.set(name=key, value=json.dumps(val), ex=300)
                 except Exception:
                     pass
+
+        await asyncio.wait_for(_scan_and_revoke(), timeout=5.0)
     except Exception as e:
         ic(f"Error revoking active sessions: {e}")
 
 @router.put('/user/secrets/config')
-async def update_apikey_configurations(inp:UpdateConfigSchema,user_email:str=Depends(verify_user)):
+async def update_apikey_configurations(
+    inp: UpdateConfigSchema,
+    background_tasks: BackgroundTasks,
+    user_email: str = Depends(verify_user)
+):
 
     enabled_methods = [m for m in inp.config.get("auth_methods", []) if m.get("enabled")]
     if len(enabled_methods)<=0:
@@ -176,7 +184,7 @@ async def update_apikey_configurations(inp:UpdateConfigSchema,user_email:str=Dep
         )
 
     res = await update_cofigurations(email=user_email,apikey=inp.apikey,new_configurations=inp.config)
-    await revoke_active_sessions_for_apikey(inp.apikey)
+    background_tasks.add_task(revoke_active_sessions_for_apikey, inp.apikey)
     return res
 
 from fastapi import UploadFile, File, Form

@@ -3,4 +3,5 @@ __pycache__
 myvenv
 test.py
 .venv
+logs
 DeB-FastAPI-Test-Logs
