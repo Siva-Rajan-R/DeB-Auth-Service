@@ -41,8 +41,13 @@ async def create_or_update_subscription(email: str, plan: str, razorpay_subscrip
     except Exception as e:
         ic(f"Error updating subscription: {e}")
 
-async def create_invoice(user_email: str, amount: float, description: str, status: str = "pending", razorpay_order_id: str = None):
+async def create_invoice(user_email: str, amount: float, description: str, status: str = "pending", razorpay_order_id: str = None, invoice_type: str = "subscription"):
     try:
+        is_otp_invoice = invoice_type == "otp" or any(k in description.lower() for k in ["sms", "otp"])
+        if is_otp_invoice and settings.is_otp_cost_exempt(user_email):
+            ic(f"Skipping invoice generation for {user_email}: whitelisted from SMS OTP costs.")
+            return None
+
         doc = {
             "user_email": user_email,
             "amount": amount,
@@ -52,8 +57,10 @@ async def create_invoice(user_email: str, amount: float, description: str, statu
             "created_at": datetime.utcnow()
         }
         await db[INVOICES_COLLECTION_NAME].insert_one(doc)
+        return doc
     except Exception as e:
         ic(f"Error creating invoice: {e}")
+        return None
 
 async def update_invoice_status(razorpay_order_id: str, status: str):
     try:

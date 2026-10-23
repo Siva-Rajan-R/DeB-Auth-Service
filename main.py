@@ -24,11 +24,12 @@ if sys.platform!='win32':
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 from contextlib import asynccontextmanager
 import asyncio
-from operations.mongo_operations.cron_jobs import check_and_notify_subscriptions
+from operations.mongo_operations.cron_jobs import check_and_notify_subscriptions, check_and_generate_sms_invoices
 
 async def cron_loop():
     while True:
         await check_and_notify_subscriptions()
+        await check_and_generate_sms_invoices()
         await asyncio.sleep(60)
 
 @asynccontextmanager

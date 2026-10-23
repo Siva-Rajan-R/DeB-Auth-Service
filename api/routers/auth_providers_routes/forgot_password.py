@@ -31,7 +31,9 @@ async def forgot_password_send(inp: ForgotPasswordSendSchema, request: Request, 
     state = await get_and_validate_auth_state(request, inp.request_id, required_step="device_validation")
 
     # Check that password auth is enabled
-    raw_methods = state.config.get('auth_methods', [])
+    flow = state.flow_type if state.flow_type in ['signin', 'signup'] else 'signin'
+    flow_specific = state.config.get(flow) if isinstance(state.config.get(flow), dict) else {}
+    raw_methods = flow_specific.get('auth_methods') if (flow_specific.get('auth_methods') is not None) else state.config.get('auth_methods', [])
     pwd_method = next((m for m in raw_methods if m.get('id') == 'password' and m.get('enabled')), None)
     if not pwd_method:
         raise HTTPException(status_code=400, detail="Password authentication is not enabled for this project")

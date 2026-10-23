@@ -42,6 +42,32 @@ class Settings(BaseSettings):
     MSG91_TEMPLATE_ID: Optional[str] = None
     MSG91_WIDGET_ID: Optional[str] = None
     MOC_OTP: bool = False
+    
+    # Whitelists
+    UNLIMITED_PROJECTS_WHITELIST: str = ""
+    OTP_COST_WHITELIST: str = ""
+
+    @property
+    def unlimited_projects_emails(self) -> list[str]:
+        if not self.UNLIMITED_PROJECTS_WHITELIST:
+            return []
+        return [e.strip().lower() for e in self.UNLIMITED_PROJECTS_WHITELIST.split(",") if e.strip()]
+
+    @property
+    def otp_cost_whitelist_emails(self) -> list[str]:
+        if not self.OTP_COST_WHITELIST:
+            return []
+        return [e.strip().lower() for e in self.OTP_COST_WHITELIST.split(",") if e.strip()]
+
+    def is_unlimited_projects_user(self, email: str) -> bool:
+        if not email:
+            return False
+        return email.strip().lower() in self.unlimited_projects_emails
+
+    def is_otp_cost_exempt(self, email: str) -> bool:
+        if not email:
+            return False
+        return email.strip().lower() in self.otp_cost_whitelist_emails
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

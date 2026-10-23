@@ -16,10 +16,10 @@ DEB_USER_REFRESH_KEY=os.getenv("DEB_USER_REFRESH_KEY")
 def revoke_user(request:Request):
     try:
         bearer_token=request.headers.get("authorization")
-        if 'Bearer' not in bearer_token:
+        if not bearer_token or 'Bearer' not in bearer_token:
             raise HTTPException(
-                status_code=422,
-                detail="Invalid token type"
+                status_code=401,
+                detail="Authorization header missing or invalid"
             )
         bearer,token = bearer_token.split(' ')
         ic(bearer,token)

@@ -34,6 +34,18 @@ async def get_current_subscription(user_email: str = Depends(verify_user)):
 async def get_invoices(user_email: str = Depends(verify_user)):
     return await get_user_invoices(user_email)
 
+@router.get("/billing/otp-cost-status")
+async def get_otp_cost_status(user_email: str = Depends(verify_user)):
+    from configs.settings import settings
+    is_exempt = settings.is_otp_cost_exempt(user_email)
+    is_unlimited = settings.is_unlimited_projects_user(user_email)
+    return {
+        "user_email": user_email,
+        "is_otp_cost_exempt": is_exempt,
+        "is_unlimited_projects": is_unlimited,
+        "rate_per_sms": 0.0 if is_exempt else 0.40
+    }
+
 @router.post("/billing/subscribe/create_order")
 async def subscribe_create_order(inp: SubscriptionCreateSchema, user_email: str = Depends(verify_user)):
     order = create_order(amount=inp.amount, receipt=f"sub_{user_email}")

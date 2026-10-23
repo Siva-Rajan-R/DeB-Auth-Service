@@ -65,3 +65,56 @@ async def check_and_notify_subscriptions():
                 
     except Exception as e:
         ic(f"Error in subscription cron job: {e}")
+
+USER_COLLECTION_NAME = "dauth_users"
+INVOICES_COLLECTION_NAME = "dauth_invoices"
+
+async def check_and_generate_sms_invoices():
+    """
+    Checks each user's SMS OTP dispatch count for the current month.
+    Generates a monthly SMS OTP usage invoice at ₹0.40 / SMS OTP.
+    Whitelisted emails in OTP_COST_WHITELIST are completely exempt (no invoices generated).
+    """
+    try:
+        now = datetime.utcnow()
+        current_month = now.strftime('%Y-%m')
+
+        cursor = db[USER_COLLECTION_NAME].find()
+        async for user in cursor:
+            email = user.get('email')
+            if not email:
+                continue
+
+            # Check if user email is whitelisted from OTP costs
+            if settings.is_otp_cost_exempt(email):
+                continue
+
+            # Check if invoice for this month's SMS OTP was already generated
+            existing_invoice = await db[INVOICES_COLLECTION_NAME].find_one({
+                "user_email": email,
+                "description": {"$regex": f"SMS OTP.*{current_month}"}
+            })
+            if existing_invoice:
+                continue
+
+            # Calculate total SMS OTPs sent across all API keys belonging to this user
+            secrets = user.get('secrets', {})
+            total_sms = 0
+            for apikey in secrets.keys():
+                analytics_doc = await db["dauth_analytics"].find_one({"_id": f"{apikey}_{current_month}"})
+                if analytics_doc:
+                    total_sms += analytics_doc.get("sms_otp_count", 0)
+
+            if total_sms > 0:
+                cost = round(total_sms * 0.40, 2)
+                await create_invoice(
+                    user_email=email,
+                    amount=cost,
+                    description=f"Monthly SMS OTP Usage ({current_month}) - {total_sms} SMS",
+                    status="pending",
+                    razorpay_order_id=f"sms_{current_month}_{int(now.timestamp())}",
+                    invoice_type="otp"
+                )
+                ic(f"Generated SMS OTP invoice of ₹{cost} for {email}")
+    except Exception as e:
+        ic(f"Error in SMS OTP billing cron: {e}")

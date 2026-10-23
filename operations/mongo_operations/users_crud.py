@@ -4,6 +4,7 @@ from input_formats.dict_inputs import User, Configuration
 from icecream import ic
 from dotenv import load_dotenv
 import os
+from configs.settings import settings
 
 load_dotenv()
 
@@ -21,6 +22,14 @@ async def create_user(user: User):
             user_doc = dict(user)
             user_doc['_id'] = email_key
             await db[USER_COLLECTION_NAME].insert_one(user_doc)
+        else:
+            update_data = {}
+            if user.get('name') and is_user.get('name') != user['name']:
+                update_data['name'] = user['name']
+            if user.get('profile_picture') and is_user.get('profile_picture') != user['profile_picture']:
+                update_data['profile_picture'] = user['profile_picture']
+            if update_data:
+                await db[USER_COLLECTION_NAME].update_one({"_id": email_key}, {"$set": update_data})
         return "User Created Successfully"
     except HTTPException:
         raise
@@ -50,8 +59,13 @@ async def create_secrets(email: str, apikey: str, client_secret: str, configurat
         cur_no_of_secrets = len(secrets)
         max_keys = user.get('max_keys', 2)
 
-        if cur_no_of_secrets >= max_keys:
+        is_whitelisted = settings.is_unlimited_projects_user(email)
+        if not is_whitelisted and cur_no_of_secrets >= max_keys:
             raise HTTPException(status_code=403, detail="max keys limit reached")
+        
+        existing_key = await db[APIKEYS_COLLECTION_NAME].find_one({"_id": apikey})
+        if existing_key:
+            raise HTTPException(status_code=400, detail="API key already exists")
         
         secrets[apikey] = client_secret
 
@@ -208,8 +222,15 @@ async def get_user_secrets(user_email: str):
                     'configurations': config
                 })
         branding = user.get('remove_branding', False)
+        is_unlimited = settings.is_unlimited_projects_user(user_email)
+        is_exempt = settings.is_otp_cost_exempt(user_email)
 
-        return {'secrets': final_secrets, 'branding': branding}
+        return {
+            'secrets': final_secrets,
+            'branding': branding,
+            'unlimited_projects': is_unlimited,
+            'otp_cost_exempt': is_exempt
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -240,9 +261,16 @@ async def check_apikey_exists(apikey: str):
 
 async def create_debuggers_cred(base_url: str):
     try:
+        deb_email = os.getenv('DEB_EMAIL')
+        deb_apikey = os.getenv('DEB_APIKEY')
+        deb_secret = os.getenv('DEB_CLIENT_SECRET')
+
+        if not deb_email or not deb_apikey:
+            return "Debuggers credentials skipped: DEB_EMAIL or DEB_APIKEY not configured"
+
         user = User(
             name="DeB-Auth-System",
-            email=os.getenv('DEB_EMAIL'),
+            email=deb_email,
             secrets={},
             remove_branding=False,
             max_keys=2
@@ -250,10 +278,26 @@ async def create_debuggers_cred(base_url: str):
 
         await create_user(user=user)
 
+        existing_key = await db[APIKEYS_COLLECTION_NAME].find_one({"_id": deb_apikey})
+        if existing_key:
+            email_key = email_key_generator(deb_email)
+            user_doc = await db[USER_COLLECTION_NAME].find_one({"_id": email_key})
+            if user_doc and deb_apikey not in user_doc.get('secrets', {}):
+                secrets = user_doc.get('secrets', {})
+                secrets[deb_apikey] = deb_secret or ""
+            current_redirects = existing_key.get('redirect_urls', {})
+            if not current_redirects.get('signin_success'):
+                current_redirects['signin_success'] = f"{base_url}/user/create"
+                await db[APIKEYS_COLLECTION_NAME].update_one(
+                    {"_id": deb_apikey},
+                    {"$set": {"redirect_urls": current_redirects}}
+                )
+            return "Debuggers Credentials Already Initialized"
+
         await create_secrets(
-            email=os.getenv('DEB_EMAIL', ""),
-            apikey=os.getenv("DEB_APIKEY", ""),
-            client_secret=os.getenv('DEB_CLIENT_SECRET', ""),
+            email=deb_email,
+            apikey=deb_apikey,
+            client_secret=deb_secret or "",
             configurations=Configuration(
                 auth_methods=[
                     {"id": "otp", "name": "OTP", "enabled": True},

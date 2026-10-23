@@ -14,6 +14,9 @@ class Configuration(TypedDict, total=False):
     ui: Optional[dict]
     two_factor: Optional[dict]
     location_based_auth: Optional[bool]
+    signin: Optional[dict]
+    signup: Optional[dict]
+    separate_config: Optional[bool]
 
 
 class User(TypedDict):

@@ -148,7 +148,10 @@ async def init_auth_flow(
         user_agent=request.headers.get("user-agent")
     )
     
-    raw_methods = state.config.get('auth_methods', [])
+    flow = state.flow_type if state.flow_type in ['signin', 'signup'] else 'signin'
+    flow_specific = state.config.get(flow) if isinstance(state.config.get(flow), dict) else {}
+
+    raw_methods = flow_specific.get('auth_methods') if (flow_specific.get('auth_methods') is not None) else state.config.get('auth_methods', [])
     email_otp_enabled = any((m['id'] == 'email_otp' or m['id'] == 'otp') and m.get('enabled') for m in raw_methods)
     mobile_otp_enabled = any(m['id'] == 'mobile_otp' and m.get('enabled') for m in raw_methods)
 
@@ -249,7 +252,10 @@ async def init_auth_flow(
 
     
     redirect_urls = state.config.get('redirect_urls', {})
-    redirect_url = redirect_urls.get('signin_success', '/')
+    if flow == 'signup':
+        redirect_url = redirect_urls.get('signup_success') or redirect_urls.get('signin_success', '/')
+    else:
+        redirect_url = redirect_urls.get('signin_success', '/')
     
     auth_token_payload={
         'ip': request.client.host,
@@ -258,20 +264,27 @@ async def init_auth_flow(
         'redirect_url': redirect_url
     }
 
-    raw_methods = state.config.get('auth_methods', [])
     enabled_methods = [m for m in raw_methods if m.get('enabled')]
     
     auth_token = generate_url_secret(data=auth_token_payload)
     
     # Send signup fields only if flow is signup
     signup_fields = state.config.get('signup_fields', []) if state.flow_type == 'signup' else []
+
+    flow_ui = {**state.config.get('ui', {}), **(flow_specific.get('ui') or {})} if isinstance(flow_specific.get('ui'), dict) else state.config.get('ui', {})
+
+    active_config = {
+        **state.config,
+        "ui": flow_ui,
+        "auth_methods": raw_methods,
+    }
     
     return {
         "auth_token": auth_token, # Used for OAuth routes
-        "config": state.config,
+        "config": active_config,
         "enabled_methods": enabled_methods,
         "signup_fields": signup_fields,
-        "branding": state.config.get('branding','De-Buggers')
+        "branding": active_config.get('branding', 'De-Buggers')
     }
 
 

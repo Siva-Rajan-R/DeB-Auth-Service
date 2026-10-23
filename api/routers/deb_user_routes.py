@@ -6,7 +6,8 @@ from core.security.unique_id import generate_unique_id
 from core.security.api_key import generate_api_key
 from pydantic import BaseModel,EmailStr
 from input_formats.dict_inputs import User,Configuration,AuthMethods
-from operations.mongo_operations.users_crud import create_user,get_user_by_email,get_all_users,delete_user,create_secrets,revoke_secrets,regenerate_client_secret,remove_apikey,update_cofigurations,get_user_secrets,check_apikey_exists,update_user_profile
+from operations.mongo_operations.users_crud import create_user,get_user_by_email,get_all_users,delete_user,create_secrets,revoke_secrets,regenerate_client_secret,remove_apikey,update_cofigurations,get_user_secrets,check_apikey_exists,update_user_profile,APIKEYS_COLLECTION_NAME
+from configs.mongo_config import db
 from operations.redis_operations.handlers import redis_set,redis_get,redis_unlink
 from core.security.otp import generate_otp
 from services.email_service.main import send_email
@@ -52,9 +53,21 @@ DEB_USER_REFRESH_KEY=os.getenv("DEB_USER_REFRESH_KEY")
 
 @router.get("/user/auth")
 async def user_auth(request:Request):
+    deb_apikey = os.getenv("DEB_APIKEY", "")
+    base_url = os.getenv("REDIRECT_BASEURL", "http://127.0.0.1:8000")
+    key_doc = await db[APIKEYS_COLLECTION_NAME].find_one({"_id": deb_apikey})
+    if key_doc:
+        current_redirects = key_doc.get('redirect_urls', {})
+        if not current_redirects.get('signin_success'):
+            current_redirects['signin_success'] = f"{base_url}/user/create"
+            await db[APIKEYS_COLLECTION_NAME].update_one(
+                {"_id": deb_apikey},
+                {"$set": {"redirect_urls": current_redirects}}
+            )
+
     response=await authenticate(
         inp=AuthSchema(
-            apikey=os.getenv("DEB_APIKEY", ""),
+            apikey=deb_apikey,
         ),
         request=request
     )
@@ -86,15 +99,17 @@ async def create_users(request:Request,res:Response,token_id:Optional[str]=None)
     else:
         user_name = raw_name
 
-    profile_pic = auth_user.get('profile_picture') or ''
+    profile_pic = auth_user.get('profile_picture') or auth_user.get('picture') or ''
 
-    formatted_user=User(
+    formatted_user = User(
         name=user_name,
         email=user_email,
         secrets={},
         remove_branding=False,
         max_keys=2
     )
+    if profile_pic:
+        formatted_user['profile_picture'] = profile_pic
 
     await create_user(formatted_user)
     json_formatted=json.dumps({'user_email':user_email})
@@ -177,7 +192,10 @@ async def update_apikey_configurations(
 ):
 
     enabled_methods = [m for m in inp.config.get("auth_methods", []) if m.get("enabled")]
-    if len(enabled_methods)<=0:
+    signin_methods = [m for m in (inp.config.get("signin") or {}).get("auth_methods", []) if m.get("enabled")]
+    signup_methods = [m for m in (inp.config.get("signup") or {}).get("auth_methods", []) if m.get("enabled")]
+
+    if not enabled_methods and not signin_methods and not signup_methods:
         raise HTTPException(
             status_code=422,
             detail="Choose atleast one auth method"
@@ -280,6 +298,9 @@ async def get_profile(user_email: str = Depends(verify_user)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return {
+        "name": user.get("name", ""),
+        "email": user.get("email", user_email),
+        "profile_picture": user.get("profile_picture") or user.get("picture", ""),
         "billing_name": user.get("billing_name", ""),
         "billing_address": user.get("billing_address", "")
     }
@@ -360,3 +381,45 @@ async def verify_delete_otp(inp: DeleteVerifySchema, user_email: str = Depends(v
     await redis_unlink(f"delete_reason_{user_email}")
     
     return {"message": "Account successfully deleted. We are sorry to see you go."}
+
+class ContactEnquirySchema(BaseModel):
+    name: str
+    phone: str
+    email: EmailStr
+    country: Optional[str] = "India"
+    state: Optional[str] = ""
+    district: Optional[str] = ""
+    business_name: Optional[str] = ""
+    enquiry_type: Optional[str] = "Book a Demo"
+    message: Optional[str] = ""
+
+@router.post("/contact/enquiry")
+async def submit_contact_enquiry(enquiry: ContactEnquirySchema, background_tasks: BackgroundTasks):
+    import datetime
+    record = enquiry.dict()
+    record["created_at"] = datetime.datetime.utcnow().isoformat()
+    try:
+        await db["contact_enquiries"].insert_one(record)
+    except Exception as e:
+        ic(f"Error saving contact enquiry: {e}")
+        
+    admin_email = os.getenv("ADMIN_NOTIFICATION_EMAIL", "debuggerstechs@gmail.com")
+    html_content = f"""
+    <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
+        <h2 style="color: #0284c7;">New DAuth Contact Enquiry / Demo Request</h2>
+        <p><strong>Name:</strong> {enquiry.name}</p>
+        <p><strong>Phone:</strong> {enquiry.phone}</p>
+        <p><strong>Email:</strong> {enquiry.email}</p>
+        <p><strong>Enquiry Type:</strong> {enquiry.enquiry_type}</p>
+        <p><strong>Business / Brand:</strong> {enquiry.business_name or 'Not specified'}</p>
+        <p><strong>Location:</strong> {enquiry.district}, {enquiry.state}, {enquiry.country}</p>
+        <p><strong>Message:</strong> {enquiry.message or 'No message provided'}</p>
+    </div>
+    """
+    try:
+        background_tasks.add_task(send_email, [admin_email], f"DAuth Demo & Enquiry: {enquiry.name} ({enquiry.enquiry_type})", html_content, True)
+    except Exception as e:
+        ic(f"Error queuing enquiry email: {e}")
+        
+    return {"success": True, "message": "Enquiry received successfully! Our team will reach out promptly."}
+

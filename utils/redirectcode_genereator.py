@@ -1,7 +1,7 @@
 from fastapi.exceptions import HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
 import secrets
-import time
+import time,os
 from hashlib import sha256
 from core.security.jwt_token import generate_jwt_token
 from loguru import logger
@@ -114,6 +114,11 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
         raw_url = redirect_urls.get('signup_success') or config.get('redirect_url', '/')
     else:
         raw_url = redirect_urls.get('signin_success') or config.get('redirect_url', '/')
+
+    deb_apikey = os.getenv("DEB_APIKEY", "")
+    if api_key == deb_apikey and (not raw_url or raw_url == '/'):
+        default_base = os.getenv("REDIRECT_BASEURL", "http://127.0.0.1:8000")
+        raw_url = f"{default_base}/user/create"
         
     base_url = sanitize_redirect_url(raw_url)
     separator = "&" if "?" in base_url else "?"
