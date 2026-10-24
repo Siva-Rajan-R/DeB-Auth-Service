@@ -43,12 +43,19 @@ async def password_login(inp: PasswordAuthSchema, request: Request):
         state.completed_steps.append("authentication_started")
 
     redirect_urls = state.config.get('redirect_urls', {})
+    add_infos = state.additional_infos or {}
     is_signup = state.flow_type == 'signup'
     verification_url = (
-        redirect_urls.get('signup_verification') if is_signup else redirect_urls.get('signin_verification')
-    ) or redirect_urls.get('verification_url')
+        (redirect_urls.get('signup_verification') if is_signup else redirect_urls.get('signin_verification'))
+        or redirect_urls.get('verification_url')
+        or (add_infos.get('signup_verification') if is_signup else add_infos.get('signin_verification'))
+        or add_infos.get('verify_url')
+        or add_infos.get('verification_url')
+    )
     failure_url = (
-        redirect_urls.get('signup_failure') if is_signup else redirect_urls.get('signin_failure')
+        (redirect_urls.get('signup_failure') if is_signup else redirect_urls.get('signin_failure'))
+        or (add_infos.get('signup_failure') if is_signup else add_infos.get('signin_failure'))
+        or add_infos.get('failure_url')
     )
 
     auth_data = state.auth_data or {}

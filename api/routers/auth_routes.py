@@ -29,23 +29,80 @@ template=Jinja2Templates("templates")
 
 
 class AuthSchema(BaseModel):
-    apikey:str
+    apikey: str
+    flow_type: Optional[str] = "signin"
+    verify_url: Optional[str] = None
+    verification_url: Optional[str] = None
+    redirect_url: Optional[str] = None
+    signin_verification: Optional[str] = None
+    signup_verification: Optional[str] = None
+    signin_redirect: Optional[str] = None
+    signup_redirect: Optional[str] = None
     additional_infos: Optional[Dict[str, Any]] = None
 
 @router.post("/auth")
-async def authenticate(inp:AuthSchema,request:Request, bgt:BackgroundTasks=None):    
-    configurations=await check_apikey_exists(inp.apikey)
-    auth_id=generate_unique_id(inp.apikey)
+async def authenticate(inp: AuthSchema, request: Request, bgt: BackgroundTasks = None):    
+    configurations = await check_apikey_exists(inp.apikey)
+    auth_id = generate_unique_id(inp.apikey)
     
+    # Merge dynamically passed verification and redirect URLs into configurations['redirect_urls']
+    redirect_urls = dict(configurations.get('redirect_urls') or {})
+    add_infos = inp.additional_infos or {}
+
+    dyn_verify = (
+        inp.verify_url 
+        or inp.verification_url 
+        or add_infos.get('verify_url') 
+        or add_infos.get('verification_url')
+    )
+    dyn_redirect = (
+        inp.redirect_url 
+        or add_infos.get('redirect_url')
+    )
+    dyn_signin_verify = (
+        inp.signin_verification 
+        or add_infos.get('signin_verification') 
+        or (dyn_verify if inp.flow_type != 'signup' else None)
+    )
+    dyn_signup_verify = (
+        inp.signup_verification 
+        or add_infos.get('signup_verification') 
+        or (dyn_verify if inp.flow_type == 'signup' else None)
+    )
+    dyn_signin_redirect = (
+        inp.signin_redirect 
+        or add_infos.get('signin_redirect') 
+        or (dyn_redirect if inp.flow_type != 'signup' else None)
+    )
+    dyn_signup_redirect = (
+        inp.signup_redirect 
+        or add_infos.get('signup_redirect') 
+        or (dyn_redirect if inp.flow_type == 'signup' else None)
+    )
+
+    if dyn_verify:
+        redirect_urls['verification_url'] = dyn_verify
+    if dyn_signin_verify:
+        redirect_urls['signin_verification'] = dyn_signin_verify
+    if dyn_signup_verify:
+        redirect_urls['signup_verification'] = dyn_signup_verify
+    if dyn_signin_redirect:
+        redirect_urls['signin_success'] = dyn_signin_redirect
+    if dyn_signup_redirect:
+        redirect_urls['signup_success'] = dyn_signup_redirect
+
+    configurations['redirect_urls'] = redirect_urls
+
     state = AuthState(
         request_id=auth_id,
         client_id=inp.apikey,
         config=configurations,
+        flow_type=inp.flow_type or "signin",
         last_activity=time.time(),
         additional_infos=inp.additional_infos
     )
 
-    await redis_set(key=auth_id,value=state.model_dump(),exp=300) # 5 minutes
+    await redis_set(key=auth_id, value=state.model_dump(), exp=300) # 5 minutes
     
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     return {
@@ -341,8 +398,19 @@ async def signup_complete(inp: SignupCompleteSchema, request: Request):
     auth_data['custom_fields'] = merged_custom_fields
 
     redirect_urls = state.config.get('redirect_urls', {})
-    verification_url = redirect_urls.get('signup_verification') or redirect_urls.get('verification_url')
-    failure_url = redirect_urls.get('signup_failure')
+    add_infos = state.additional_infos or {}
+    verification_url = (
+        redirect_urls.get('signup_verification') 
+        or redirect_urls.get('verification_url')
+        or add_infos.get('signup_verification')
+        or add_infos.get('verify_url')
+        or add_infos.get('verification_url')
+    )
+    failure_url = (
+        redirect_urls.get('signup_failure')
+        or add_infos.get('signup_failure')
+        or add_infos.get('failure_url')
+    )
 
     verify_payload = {
         'request_id': inp.request_id,
