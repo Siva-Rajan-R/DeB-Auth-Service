@@ -2,6 +2,7 @@ from fastapi import Request, HTTPException, Header
 from typing import Optional
 from schemas.auth_state_schema import AuthState, DeviceFingerprint
 from operations.redis_operations.handlers import redis_get, redis_set
+from utils.redirectcode_genereator import get_client_ip
 from icecream import ic
 import time
 
@@ -45,7 +46,7 @@ async def get_and_validate_auth_state(
         raise HTTPException(status_code=403, detail={"message": "Authentication flow timed out", "redirect_url": failure_url})
     
     # 3. Validate Fingerprint (if initialized)
-    ip = request.client.host if request.client else "unknown"
+    ip = get_client_ip(request)
     browser = request.headers.get("x-device-browser")
     os = request.headers.get("x-device-os")
     device = request.headers.get("x-device-type")

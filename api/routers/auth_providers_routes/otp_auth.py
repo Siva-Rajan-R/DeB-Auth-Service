@@ -15,7 +15,7 @@ from hashlib import sha256
 from dotenv import load_dotenv
 import os
 from operations.redis_operations.handlers import redis_set,redis_get,redis_unlink,redis_curttl
-from utils.redirectcode_genereator import generate_redirect_code
+from utils.redirectcode_genereator import generate_redirect_code, get_client_ip
 from utils.verification_service import perform_external_verification
 from utils.url_secret_generator import verify_url_secret
 from api.dependencies.auth_state import get_and_validate_auth_state
@@ -37,6 +37,8 @@ class OtpSendSchema(BaseModel):
 class OtpVerifySchema(BaseModel):
     request_id: str
     otp: str
+    client_verified: Optional[bool] = False
+    verify_result: Optional[dict] = None
 
 # otp auth starts here
 @router.post("/auth/login/otp")
@@ -215,21 +217,26 @@ async def verify_otp(inp: OtpVerifySchema, request:Request):
         'mobile_number': auth_data.get('mobile_number'),
         'full_name': auth_data.get('full_name'),
         'custom_fields': auth_data.get('custom_fields', {}),
-        'ip': request.client.host if request.client else "unknown",
+        'ip': get_client_ip(request),
         'user_agent': request.headers.get("User-Agent", "unknown"),
-        'client_id': state.client_id
+        'client_id': state.client_id,
+        'caller_ip': add_infos.get('_caller_ip')
     }
 
     # Call external verification endpoint if configured
-    verify_result = await perform_external_verification(
-        verification_url=verification_url,
-        failure_url=failure_url,
-        payload=verify_payload,
-        request=request,
-        client_id=state.client_id,
-        auth_provider=auth_data.get('auth_provider', 'otp'),
-        identifier=auth_data.get('email') or auth_data.get('mobile_number') or "unknown"
-    )
+    if inp.client_verified and inp.verify_result:
+        verify_result = inp.verify_result
+        ic("Using client-side verification result for OTP")
+    else:
+        verify_result = await perform_external_verification(
+            verification_url=verification_url,
+            failure_url=failure_url,
+            payload=verify_payload,
+            request=request,
+            client_id=state.client_id,
+            auth_provider=auth_data.get('auth_provider', 'otp'),
+            identifier=auth_data.get('email') or auth_data.get('mobile_number') or "unknown"
+        )
 
     if isinstance(verify_result, dict):
         if verify_result.get('custom_fields'):

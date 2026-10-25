@@ -11,7 +11,7 @@ from icecream import ic
 from utils.url_secret_generator import generate_url_secret,verify_url_secret
 from operations.redis_operations.session_manager import get_global_session, extend_global_session
 from operations.mongo_operations.end_users_crud import get_all_end_users, update_end_user
-from utils.redirectcode_genereator import generate_redirect_code
+from utils.redirectcode_genereator import generate_redirect_code, sanitize_redirect_url, get_client_ip
 from utils.verification_service import perform_external_verification
 from operations.mongo_operations.analytics_crud import log_auth_request
 
@@ -38,6 +38,7 @@ class AuthSchema(BaseModel):
     signup_verification: Optional[str] = None
     signin_redirect: Optional[str] = None
     signup_redirect: Optional[str] = None
+    show_error_codes: Optional[bool] = None
     additional_infos: Optional[Dict[str, Any]] = None
 
 @router.post("/auth")
@@ -47,7 +48,9 @@ async def authenticate(inp: AuthSchema, request: Request, bgt: BackgroundTasks =
     
     # Merge dynamically passed verification and redirect URLs into configurations['redirect_urls']
     redirect_urls = dict(configurations.get('redirect_urls') or {})
-    add_infos = inp.additional_infos or {}
+    add_infos = dict(inp.additional_infos or {})
+    caller_ip = get_client_ip(request)
+    add_infos['_caller_ip'] = caller_ip
 
     dyn_verify = (
         inp.verify_url 
@@ -81,15 +84,23 @@ async def authenticate(inp: AuthSchema, request: Request, bgt: BackgroundTasks =
     )
 
     if dyn_verify:
-        redirect_urls['verification_url'] = dyn_verify
+        redirect_urls['verification_url'] = sanitize_redirect_url(dyn_verify)
     if dyn_signin_verify:
-        redirect_urls['signin_verification'] = dyn_signin_verify
+        redirect_urls['signin_verification'] = sanitize_redirect_url(dyn_signin_verify)
     if dyn_signup_verify:
-        redirect_urls['signup_verification'] = dyn_signup_verify
+        redirect_urls['signup_verification'] = sanitize_redirect_url(dyn_signup_verify)
     if dyn_signin_redirect:
-        redirect_urls['signin_success'] = dyn_signin_redirect
+        redirect_urls['signin_success'] = sanitize_redirect_url(dyn_signin_redirect)
     if dyn_signup_redirect:
-        redirect_urls['signup_success'] = dyn_signup_redirect
+        redirect_urls['signup_success'] = sanitize_redirect_url(dyn_signup_redirect)
+
+    dyn_show_error_codes = (
+        inp.show_error_codes 
+        if inp.show_error_codes is not None 
+        else add_infos.get('show_error_codes')
+    )
+    if dyn_show_error_codes is not None:
+        redirect_urls['show_error_codes'] = bool(dyn_show_error_codes)
 
     configurations['redirect_urls'] = redirect_urls
 
@@ -99,7 +110,7 @@ async def authenticate(inp: AuthSchema, request: Request, bgt: BackgroundTasks =
         config=configurations,
         flow_type=inp.flow_type or "signin",
         last_activity=time.time(),
-        additional_infos=inp.additional_infos
+        additional_infos=add_infos
     )
 
     await redis_set(key=auth_id, value=state.model_dump(), exp=300) # 5 minutes
@@ -198,7 +209,7 @@ async def init_auth_flow(
         state.completed_steps.append("device_validation")
         
     state.device_fingerprint = DeviceFingerprint(
-        ip=request.client.host if request.client else "unknown",
+        ip=get_client_ip(request),
         browser=request.headers.get("x-device-browser"),
         os=request.headers.get("x-device-os"),
         device=request.headers.get("x-device-type"),
@@ -385,6 +396,8 @@ async def get_authenticated_user(inp:AuthenticatedUserSchema,request:Request):
 class SignupCompleteSchema(BaseModel):
     request_id: str
     custom_fields: dict
+    client_verified: Optional[bool] = False
+    verify_result: Optional[dict] = None
 
 @router.post("/api/auth/request/signup/complete")
 async def signup_complete(inp: SignupCompleteSchema, request: Request):
@@ -420,20 +433,25 @@ async def signup_complete(inp: SignupCompleteSchema, request: Request):
         'mobile_number': auth_data.get('mobile_number'),
         'full_name': auth_data.get('full_name'),
         'custom_fields': merged_custom_fields,
-        'ip': request.client.host if request.client else "unknown",
+        'ip': get_client_ip(request),
         'user_agent': request.headers.get("User-Agent", "unknown"),
-        'client_id': state.client_id
+        'client_id': state.client_id,
+        'caller_ip': add_infos.get('_caller_ip')
     }
 
-    verify_result = await perform_external_verification(
-        verification_url=verification_url,
-        failure_url=failure_url,
-        payload=verify_payload,
-        request=request,
-        client_id=state.client_id,
-        auth_provider=auth_data.get('auth_provider', 'signup'),
-        identifier=auth_data.get('email') or auth_data.get('mobile_number') or "unknown"
-    )
+    if inp.client_verified and inp.verify_result:
+        verify_result = inp.verify_result
+        ic("Using client-side verification result for signup complete")
+    else:
+        verify_result = await perform_external_verification(
+            verification_url=verification_url,
+            failure_url=failure_url,
+            payload=verify_payload,
+            request=request,
+            client_id=state.client_id,
+            auth_provider=auth_data.get('auth_provider', 'signup'),
+            identifier=auth_data.get('email') or auth_data.get('mobile_number') or "unknown"
+        )
 
     if isinstance(verify_result, dict):
         if verify_result.get('custom_fields'):

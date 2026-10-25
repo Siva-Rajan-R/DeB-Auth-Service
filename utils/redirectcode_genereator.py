@@ -13,6 +13,30 @@ from operations.redis_operations.session_manager import create_global_session, c
 from schemas.db_schemas.end_user_schema import EndUser
 from operations.mongo_operations.analytics_crud import log_audit_event, log_auth_request
 import asyncio
+from urllib.parse import urlparse, urlunparse
+
+def get_client_ip(request) -> str:
+    """
+    Extracts the true client IP from standard proxy headers (X-Forwarded-For, X-Real-IP)
+    or directly from the request connection.
+    """
+    if not request:
+        return "127.0.0.1"
+    forwarded = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
+    if forwarded:
+        ips = [ip.strip() for ip in forwarded.split(",") if ip.strip()]
+        for ip in ips:
+            if ip.lower() not in ("127.0.0.1", "::1", "localhost", "unknown"):
+                return ip
+        if ips:
+            return ips[0]
+    real_ip = request.headers.get("x-real-ip") or request.headers.get("X-Real-IP")
+    if real_ip and real_ip.strip():
+        return real_ip.strip()
+    if getattr(request, "client", None) and request.client.host:
+        return request.client.host
+    return "127.0.0.1"
+
 
 def sanitize_redirect_url(url: str, default: str = "/") -> str:
     if not url:
@@ -22,9 +46,34 @@ def sanitize_redirect_url(url: str, default: str = "/") -> str:
         return default
     if cleaned.startswith(("http://", "https://", "/")):
         return cleaned
+    lowered = cleaned.lower()
+    if lowered.startswith(("localhost", "127.0.0.1", "0.0.0.0", "[::1]", "::1")):
+        return f"http://{cleaned}"
     if "." in cleaned and not cleaned.startswith("/"):
         return f"https://{cleaned}"
     return cleaned
+
+
+def is_localhost_url(url: str) -> bool:
+    if not url:
+        return False
+    try:
+        cleaned = sanitize_redirect_url(url)
+        parsed = urlparse(cleaned)
+        hostname = (parsed.hostname or "").lower()
+        return hostname in ("localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]")
+    except Exception:
+        return False
+
+
+def resolve_target_url(url: str, client_ip: str = None) -> str:
+    """
+    Sanitizes and normalizes target verification/redirect URLs.
+    Preserves loopback URLs (localhost/127.0.0.1) without rewriting to external WAN IPs.
+    """
+    if not url:
+        return url
+    return sanitize_redirect_url(url)
 
 
 async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False, request=None, return_json:bool=False):
@@ -60,16 +109,24 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
     lock_method = session_data.get('lock_method')
     prefilled = bool(locked_email or locked_phone)
 
+    flow_type = (
+        auth_user.get('flow_type') 
+        or extracted_auth_dict.get('flow_type') 
+        or session_data.get('flow_type') 
+        or 'signin'
+    )
+
     jwt_payload = {
         "email": auth_user.get('email') or None,
         "mobile_number": auth_user.get('mobile_number'),
         "name": auth_user.get('name') or auth_user.get('full_name'),
         'profile_picture': auth_user.get('profile_picture'),
-        'custom_fields': auth_user.get('custom_fields', {}),
+        'flow_type': flow_type,
         'auth_provider': auth_user.get('auth_provider', 'unknown'),
+        'custom_fields': auth_user.get('custom_fields', {}),
+        'additional_infos': session_data.get('additional_infos'),
         'prefilled': prefilled,
         'lock_method': lock_method or None,
-        'additional_infos': session_data.get('additional_infos'),
         'location': {
             'lat': session_data.get('latitude'),
             'lng': session_data.get('longitude')
@@ -77,10 +134,10 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
     }
 
     if request:
-        jwt_payload['ip'] = request.client.host if request.client else "unknown"
+        jwt_payload['ip'] = get_client_ip(request)
         jwt_payload['browser'] = request.headers.get("User-Agent", "unknown")
 
-    ip_addr = request.client.host if request and request.client else "unknown"
+    ip_addr = get_client_ip(request) if request else "unknown"
     asyncio.create_task(log_audit_event(
         api_key,
         ip_addr,
@@ -108,7 +165,6 @@ async def generate_redirect_code(auth_user:dict,auth_id:str,isfor_otp:bool=False
     await redis_set(key=auth_code,value=authenticated_values,exp=300)
 
     redirect_urls = config.get('redirect_urls', {})
-    flow_type = extracted_auth_dict.get('flow_type', 'signin')
     
     if flow_type == 'signup':
         raw_url = redirect_urls.get('signup_success') or config.get('redirect_url', '/')

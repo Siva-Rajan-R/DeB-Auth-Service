@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any
 from urllib.parse import quote
 from operations.redis_operations.handlers import redis_set
-from utils.redirectcode_genereator import generate_redirect_code, sanitize_redirect_url
+from utils.redirectcode_genereator import generate_redirect_code, sanitize_redirect_url, get_client_ip
 from utils.verification_service import perform_external_verification
 from api.dependencies.auth_state import get_and_validate_auth_state
 
@@ -19,6 +19,8 @@ class PasswordAuthSchema(BaseModel):
     custom_fields: Optional[Dict[str, Any]] = {}
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    client_verified: Optional[bool] = False
+    verify_result: Optional[Dict[str, Any]] = None
 
 @router.post("/auth/login/password")
 async def password_login(inp: PasswordAuthSchema, request: Request):
@@ -90,32 +92,37 @@ async def password_login(inp: PasswordAuthSchema, request: Request):
         'custom_fields': inp.custom_fields or {},
         'latitude': inp.latitude,
         'longitude': inp.longitude,
-        'ip': request.client.host if request.client else "unknown",
+        'ip': get_client_ip(request),
         'user_agent': request.headers.get("User-Agent", "unknown"),
-        'client_id': state.client_id
+        'client_id': state.client_id,
+        'caller_ip': add_infos.get('_caller_ip')
     }
 
-    try:
-        # Call external verification endpoint if configured
-        verify_result = await perform_external_verification(
-            verification_url=verification_url,
-            failure_url=failure_url,
-            payload=verify_payload,
-            request=request,
-            client_id=state.client_id,
-            auth_provider="password",
-            identifier=inp.email,
-            current_attempts=verify_count + 1,
-            max_attempts=3
-        )
-    except HTTPException:
-        # Increment failed count and persist
-        auth_data['verify_count'] = verify_count + 1
-        state.auth_data = auth_data
-        if auth_data['verify_count'] >= 3:
-            state.status = "failed"
-        await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)
-        raise
+    if inp.client_verified and inp.verify_result:
+        verify_result = inp.verify_result
+        logger.info(f"Using client-side verification result for {inp.email} (request_id={inp.request_id})")
+    else:
+        try:
+            # Call external verification endpoint if configured
+            verify_result = await perform_external_verification(
+                verification_url=verification_url,
+                failure_url=failure_url,
+                payload=verify_payload,
+                request=request,
+                client_id=state.client_id,
+                auth_provider="password",
+                identifier=inp.email,
+                current_attempts=verify_count + 1,
+                max_attempts=3
+            )
+        except HTTPException:
+            # Increment failed count and persist
+            auth_data['verify_count'] = verify_count + 1
+            state.auth_data = auth_data
+            if auth_data['verify_count'] >= 3:
+                state.status = "failed"
+            await redis_set(key=inp.request_id, value=state.model_dump(), exp=300)
+            raise
 
     # If verification returned updated name or custom fields, merge them
     if isinstance(verify_result, dict):

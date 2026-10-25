@@ -2,7 +2,8 @@ import httpx
 from fastapi import HTTPException
 from urllib.parse import quote
 from loguru import logger
-from utils.redirectcode_genereator import sanitize_redirect_url
+from utils.redirectcode_genereator import sanitize_redirect_url, resolve_target_url, get_client_ip, is_localhost_url
+from urllib.parse import urlparse, urlunparse
 import asyncio
 from operations.mongo_operations.analytics_crud import log_audit_event
 
@@ -37,20 +38,52 @@ async def perform_external_verification(
     if not cleaned_url or cleaned_url == "/":
         return {}
 
-    logger.info(f"Calling verification endpoint: {cleaned_url} for client: {client_id} (Attempt {current_attempts}/{max_attempts})")
+    client_ip = (payload.get("caller_ip") if payload else None) or get_client_ip(request)
+    target_url = resolve_target_url(cleaned_url, client_ip)
 
+    logger.info(f"Calling verification endpoint: {target_url} for client: {client_id} (Attempt {current_attempts}/{max_attempts})")
+
+    req_headers = {
+        "x-dauth-request-id": str(payload.get("request_id", "")),
+        "x-client-id": str(client_id or ""),
+        "Content-Type": "application/json",
+        "User-Agent": "DAuth-Verification-Service/1.0"
+    }
+
+    resp = None
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                cleaned_url,
-                json=payload,
-                headers={
-                    "x-dauth-request-id": str(payload.get("request_id", "")),
-                    "x-client-id": str(client_id or ""),
-                    "Content-Type": "application/json",
-                    "User-Agent": "DAuth-Verification-Service/1.0"
-                }
-            )
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    target_url,
+                    json=payload,
+                    headers=req_headers
+                )
+        except (httpx.ConnectError, httpx.ConnectTimeout) as conn_err:
+            # If target is localhost and running in container, fallback to host.docker.internal
+            if is_localhost_url(target_url):
+                try:
+                    parsed = urlparse(target_url)
+                    port_part = f":{parsed.port}" if parsed.port else ""
+                    docker_url = urlunparse((
+                        parsed.scheme or "http",
+                        f"host.docker.internal{port_part}",
+                        parsed.path,
+                        parsed.params,
+                        parsed.query,
+                        parsed.fragment
+                    ))
+                    logger.info(f"Localhost verification fallback: attempting {docker_url}")
+                    async with httpx.AsyncClient(timeout=5.0) as client:
+                        resp = await client.post(
+                            docker_url,
+                            json=payload,
+                            headers=req_headers
+                        )
+                except Exception:
+                    raise conn_err
+            else:
+                raise conn_err
 
             resp_json = {}
             try:
@@ -81,7 +114,7 @@ async def perform_external_verification(
 
                 msg = str(raw_msg)
 
-                ip = request.client.host if request and request.client else "unknown"
+                ip = client_ip or (request.client.host if request and request.client else "unknown")
                 asyncio.create_task(
                     log_audit_event(client_id, ip, auth_provider, identifier, "VERIFICATION_FAILED", "FAILED")
                 )
@@ -121,11 +154,14 @@ async def perform_external_verification(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error calling verification URL ({cleaned_url}): {e}")
+        logger.error(f"Error calling verification URL ({target_url}): {e}")
         status_code = 502
-        msg = f"Failed to reach verification endpoint: {str(e)}"
+        if is_localhost_url(target_url):
+            msg = f"Failed to reach local verification endpoint ({target_url}). Ensure your local service is running and accessible."
+        else:
+            msg = f"Failed to reach verification endpoint: {str(e)}"
         
-        ip = request.client.host if request and request.client else "unknown"
+        ip = client_ip or (request.client.host if request and request.client else "unknown")
         asyncio.create_task(
             log_audit_event(client_id, ip, auth_provider, identifier, "VERIFICATION_ERROR", "FAILED")
         )
