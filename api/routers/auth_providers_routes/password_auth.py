@@ -1,3 +1,4 @@
+from loguru import logger
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any
